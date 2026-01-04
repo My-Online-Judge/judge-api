@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 import vn.thanhtuanle.entity.Problem;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -14,4 +15,6 @@ public interface ProblemRepository extends JpaRepository<Problem, UUID>, JpaSpec
     boolean existsByProblemSlug(String problemSlug);
 
     Page<Problem> findByTitleContainingIgnoreCase(String title, Pageable pageable);
+
+    Optional<Problem> findByProblemSlug(String problemSlug);
 }

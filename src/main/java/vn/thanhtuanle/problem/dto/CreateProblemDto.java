@@ -17,6 +17,9 @@ public class CreateProblemDto {
     @NotBlank(message = "Title is required")
     private String title;
 
+    @NotBlank(message = "Subject is required")
+    private String subject;
+
     private String description;
 
     @Min(value = 1, message = "Time limit must be at least 1 ms")

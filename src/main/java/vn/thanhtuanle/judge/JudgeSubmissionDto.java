@@ -26,8 +26,5 @@ public class JudgeSubmissionDto {
     @JsonProperty("test_case_id")
     private String testCaseId;
 
-    @JsonProperty("user_id")
-    private Long userId;
-
     private Boolean output;
 }

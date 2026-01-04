@@ -19,10 +19,4 @@ import org.springframework.web.bind.annotation.RestController;
 public class JudgeController {
 
     private final JudgeService judgeService;
-
-    @Operation(summary = "Submit code", description = "Submit code to judge server")
-    @PostMapping
-    public ApiResponse<JudgeResponseDto> submitCode(@RequestBody JudgeSubmissionDto submissionDto) {
-        return ApiResponse.success(judgeService.submitCode(submissionDto));
-    }
 }

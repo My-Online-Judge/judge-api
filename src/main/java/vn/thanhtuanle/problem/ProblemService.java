@@ -55,6 +55,7 @@ public class ProblemService {
 
         Problem problem = Problem.builder()
                 .title(dto.getTitle())
+                .subject(dto.getSubject())
                 .description(dto.getDescription())
                 .timeLimit(dto.getTimeLimit())
                 .memoryLimit(dto.getMemoryLimit())
