@@ -1,7 +1,8 @@
-package vn.thanhtuanle.config;
+package vn.thanhtuanle.common.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -42,10 +43,34 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message, errors);
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Object> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException ex) {
+        log.error("Malformed JSON request: ", ex);
+        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "Malformed JSON request: " + ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Object> handleGlobalException(Exception ex) {
         log.error("Internal Server Error: ", ex);
         return ApiResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error: " + ex.getMessage());
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Object> handleResourceNotFoundException(
+            ResourceNotFoundException ex) {
+        log.error("Resource Not Found: ", ex);
+        return ApiResponse.error(HttpStatus.NOT_FOUND.value(), ex.getMessage());
+    }
+
+    @ExceptionHandler(ResourceAlreadyExistException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Object> handleResourceAlreadyExistException(
+            ResourceAlreadyExistException ex) {
+        log.error("Resource Already Exist: ", ex);
+        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
     }
 }

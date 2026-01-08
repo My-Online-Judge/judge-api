@@ -57,7 +57,7 @@ public class JudgeService {
                 .exeName(language.getExeName())
                 .maxCpuTime(3000)
                 .maxRealTime(5000)
-                .maxMemory(128L * 1024 * 1024)
+                .maxMemory(language.getCompileMaxMemory())
                 .compileCommand(language.getCompileCommand())
                 .build();
 
@@ -75,8 +75,8 @@ public class JudgeService {
         JudgeSubmissionDto request = JudgeSubmissionDto.builder()
                 .src(sourceCode)
                 .languageConfig(languageConfig)
-                .maxCpuTime(problem.getTimeLimit())
-                .maxMemory((long) problem.getMemoryLimit() * 1024 * 1024)
+                .maxCpuTime(1000)
+                .maxMemory(language.getMaxMemory())
                 .testCaseId(problem.getProblemSlug())
                 .output(true)
                 .build();
