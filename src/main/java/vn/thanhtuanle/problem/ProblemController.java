@@ -53,8 +53,6 @@ public class ProblemController {
             @RequestParam(required = false) ProblemStatus status) {
 
         log.info("Start get problems: page={}, size={}, search={}, status={}", page, size, search, status);
-
-        log.info("END get problems");
         return ApiResponse.success(problemService.getProblems(page, size, search, status));
     }
 }

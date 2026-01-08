@@ -14,6 +14,7 @@ import vn.thanhtuanle.common.payload.BaseResponse;
 @EqualsAndHashCode(callSuper = true)
 public class ProblemResponseDto extends BaseResponse {
     private String title;
+    private String subject;
     private String description;
     private int timeLimit;
     private int memoryLimit;

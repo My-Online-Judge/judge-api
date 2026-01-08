@@ -1,0 +1,27 @@
+package vn.thanhtuanle.submission.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
+import vn.thanhtuanle.common.payload.BaseResponse;
+import vn.thanhtuanle.judge.dto.JudgeResultDto;
+
+import java.util.List;
+
+@Data
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+public class SubmissionResponseDto extends BaseResponse {
+    private Long userId;
+    private String sourceCode;
+    private Integer status;
+    private Integer result;
+    private String errorMessage;
+    private Integer cpuTime;
+    private Long memory;
+    private List<JudgeResultDto> details;
+}
