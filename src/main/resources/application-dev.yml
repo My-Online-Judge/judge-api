@@ -3,9 +3,9 @@ spring:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:postgresql://localhost:5432/my_oj
-    username: postgres
-    password: 123456
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     properties:
@@ -40,3 +40,11 @@ logging:
     vn.thanhtuanle: DEBUG
   file:
     name: log/app.log
+
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+      expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
+      refresh-token:
+        expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}

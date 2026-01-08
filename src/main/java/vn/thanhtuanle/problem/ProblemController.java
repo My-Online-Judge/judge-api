@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -54,5 +55,12 @@ public class ProblemController {
 
         log.info("Start get problems: page={}, size={}, search={}, status={}", page, size, search, status);
         return ApiResponse.success(problemService.getProblems(page, size, search, status));
+    }
+
+    @GetMapping("/{slug}")
+    @Operation(summary = "Get problem by slug")
+    public ApiResponse<ProblemResponseDto> getProblemBySlug(@PathVariable String slug) {
+        log.info("Start get problem by slug: {}", slug);
+        return ApiResponse.success(problemService.getProblemBySlug(slug));
     }
 }

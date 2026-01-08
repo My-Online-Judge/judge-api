@@ -1,5 +1,7 @@
 package vn.thanhtuanle.problem.dto;
 
+import java.util.Map;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -16,9 +18,9 @@ public class ProblemResponseDto extends BaseResponse {
     private String title;
     private String subject;
     private String description;
-    private int timeLimit;
-    private int memoryLimit;
-    private int hardnessLevel;
+    private Integer timeLimit;
+    private Integer memoryLimit;
+    private Integer hardnessLevel;
     private String problemSlug;
     private String sampleInput;
     private String sampleOutput;
@@ -26,4 +28,7 @@ public class ProblemResponseDto extends BaseResponse {
     private String outputDescription;
     private String hint;
     private int status;
+    private Integer totalSubmission;
+    private Integer acceptedSubmission;
+    private Map<String, Integer> statisticInfo;
 }

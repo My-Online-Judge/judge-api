@@ -36,6 +36,10 @@ public class Language extends BaseEntity {
 
     private String exeName;
 
+    private Long compileMaxMemory;
+
+    private Long maxMemory;
+
     @OneToMany(mappedBy = "language", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Submission> submissions = new ArrayList<>();
 

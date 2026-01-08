@@ -6,6 +6,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.http.HttpStatus;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.List;
 
@@ -19,16 +22,18 @@ public class ApiResponse<T> {
     private String message;
     private T data;
     private Map<String, String> errors;
-    private long timestamp;
+    private String timestamp;
 
     private PageResponse<?> pagination;
+
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     public static <T> ApiResponse<T> success(T data) {
         return ApiResponse.<T>builder()
                 .status(HttpStatus.OK.value())
                 .message("Success")
                 .data(data)
-                .timestamp(System.currentTimeMillis())
+                .timestamp(LocalDateTime.now().format(TIMESTAMP_FORMATTER))
                 .build();
     }
 
@@ -40,7 +45,7 @@ public class ApiResponse<T> {
                 .message("Success")
                 .data(data)
                 .pagination(pageResponse)
-                .timestamp(System.currentTimeMillis())
+                .timestamp(LocalDateTime.now().format(TIMESTAMP_FORMATTER))
                 .build();
     }
 
@@ -49,7 +54,7 @@ public class ApiResponse<T> {
                 .status(HttpStatus.OK.value())
                 .message(message)
                 .data(data)
-                .timestamp(System.currentTimeMillis())
+                .timestamp(LocalDateTime.now().format(TIMESTAMP_FORMATTER))
                 .build();
     }
 
@@ -58,7 +63,7 @@ public class ApiResponse<T> {
                 .status(HttpStatus.CREATED.value())
                 .message("Created")
                 .data(data)
-                .timestamp(System.currentTimeMillis())
+                .timestamp(LocalDateTime.now().format(TIMESTAMP_FORMATTER))
                 .build();
     }
 
@@ -68,7 +73,7 @@ public class ApiResponse<T> {
                 .message(message)
                 .data(null)
                 .errors(null)
-                .timestamp(System.currentTimeMillis())
+                .timestamp(LocalDateTime.now().format(TIMESTAMP_FORMATTER))
                 .build();
     }
 
@@ -78,7 +83,7 @@ public class ApiResponse<T> {
                 .message(message)
                 .data(null)
                 .errors(errors)
-                .timestamp(System.currentTimeMillis())
+                .timestamp(LocalDateTime.now().format(TIMESTAMP_FORMATTER))
                 .build();
     }
 }

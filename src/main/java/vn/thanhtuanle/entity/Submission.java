@@ -37,6 +37,8 @@ public class Submission extends BaseEntity {
 
     private Long memory;
 
+    private Boolean shareSubmission;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "problem_id", referencedColumnName = "id", nullable = false)
     private Problem problem;

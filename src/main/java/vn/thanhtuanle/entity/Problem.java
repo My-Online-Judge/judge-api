@@ -32,7 +32,7 @@ public class Problem extends BaseEntity {
 
     private int timeLimit; // in milliseconds
 
-    private int memoryLimit; // in megabytes
+    private Long memoryLimit; // in megabytes
 
     private int hardnessLevel; // e.g., 1 (easy), 2 (medium), 3 (hard)
 

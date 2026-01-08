@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Language;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
@@ -15,7 +16,6 @@ import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 import vn.thanhtuanle.problem.ProblemRepository;
 import vn.thanhtuanle.language.LanguageRepository;
-import vn.thanhtuanle.common.enums.SubmissionStatus;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -64,7 +64,6 @@ public class SubmissionService {
                 .sourceCode(req.getSourceCode())
                 .problem(problem)
                 .language(language)
-                .status(SubmissionStatus.PENDING.getValue())
                 .time(0)
                 .memory(0L)
                 .build();
@@ -76,7 +75,7 @@ public class SubmissionService {
             return processJudgeResponse(submission, judgeResponse);
         } catch (Exception e) {
             log.error("Error during judging", e);
-            submission.setStatus(SubmissionStatus.ERROR.getValue());
+            submission.setStatus(SubmissionResult.WRONG_ANSWER.getValue());
             submission.setErrorMessage(e.getMessage());
             return new ArrayList<>();
         }
@@ -86,7 +85,7 @@ public class SubmissionService {
         List<JudgeResultDto> details = new ArrayList<>();
         if (judgeResponse.getErr() != null) {
             log.info("Judge service returned error: {}", judgeResponse.getErr());
-            submission.setStatus(SubmissionStatus.ERROR.getValue());
+            submission.setStatus(SubmissionResult.WRONG_ANSWER.getValue());
             String extraInfo = judgeResponse.getData() != null ? judgeResponse.getData().asText() : "";
             submission.setErrorMessage(judgeResponse.getErr() + (extraInfo.isEmpty() ? "" : ": " + extraInfo));
         } else if (judgeResponse.getData() != null) {
@@ -120,15 +119,15 @@ public class SubmissionService {
                 submission.setTime(maxRealTime);
                 submission.setMemory(maxMemory);
                 submission.setResult(finalResult);
-                submission.setStatus(SubmissionStatus.JUDGED.getValue());
+                submission.setStatus(finalResult == 0 ? SubmissionResult.SUCCESS.getValue() : SubmissionResult.WRONG_ANSWER.getValue());
             } else {
                 log.info("Judge service returned non-array data, marking as error");
-                submission.setStatus(SubmissionStatus.ERROR.getValue());
+                submission.setStatus(SubmissionResult.WRONG_ANSWER.getValue());
                 submission.setErrorMessage(judgeResponse.getData().asText());
             }
         } else {
             log.info("Judge service returned unknown response, marking as error");
-            submission.setStatus(SubmissionStatus.ERROR.getValue());
+            submission.setStatus(SubmissionResult.WRONG_ANSWER.getValue());
             submission.setErrorMessage("Unknown judge response");
         }
 
