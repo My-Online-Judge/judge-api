@@ -19,9 +19,6 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 public class Submission extends BaseEntity {
-
-    private Long userId;
-
     @Column(columnDefinition = "TEXT")
     private String sourceCode;
 
@@ -46,4 +43,8 @@ public class Submission extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "language_id", referencedColumnName = "id", nullable = false)
     private Language language;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
+    private User user;
 }

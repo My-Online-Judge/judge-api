@@ -13,4 +13,6 @@ public class SubmissionRequestDto {
     private String languageIdentifier;
 
     private String problemSlug;
+
+    private Boolean shareSubmission = false;
 }

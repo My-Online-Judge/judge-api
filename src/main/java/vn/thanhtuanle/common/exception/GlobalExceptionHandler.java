@@ -3,12 +3,14 @@ package vn.thanhtuanle.common.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import vn.thanhtuanle.common.payload.ApiResponse;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -72,5 +74,22 @@ public class GlobalExceptionHandler {
             ResourceAlreadyExistException ex) {
         log.error("Resource Already Exist: ", ex);
         return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
+    }
+
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {
+        log.error("AppException: ", ex);
+        ErrorCode errorCode = ex.getErrorCode();
+        return ResponseEntity
+                .status(errorCode.getStatusCode())
+                .body(ApiResponse.error(errorCode.getStatusCode().value(), errorCode.getMessage()));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiResponse<Object> handleAccessDeniedException(
+            AccessDeniedException ex) {
+        log.error("Access Denied: ", ex);
+        return ApiResponse.error(HttpStatus.FORBIDDEN.value(), "Access Denied: " + ex.getMessage());
     }
 }

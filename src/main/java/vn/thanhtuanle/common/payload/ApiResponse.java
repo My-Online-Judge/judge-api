@@ -37,6 +37,14 @@ public class ApiResponse<T> {
                 .build();
     }
 
+    public static <T> ApiResponse<T> success() {
+        return ApiResponse.<T>builder()
+                .status(HttpStatus.OK.value())
+                .message("Success")
+                .timestamp(LocalDateTime.now().format(TIMESTAMP_FORMATTER))
+                .build();
+    }
+
     public static <T> ApiResponse<List<T>> success(PageResponse<T> pageResponse) {
         List<T> data = pageResponse.getData();
         pageResponse.setData(null);
