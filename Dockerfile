@@ -1,9 +1,13 @@
-FROM openjdk:17
-
-ARG JAR_FILE=target/*.jar
-
-COPY ${JAR_FILE} backend-service.jar
-
-ENTRYPOINT ["java", "-jar", "backend-service.jar"]
-
-EXPOSE 8080
+# Build stage
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline
+COPY src ./src
+RUN mvn clean package -DskipTests
+# Run stage
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=builder /app/target/backend-service.jar app.jar
+EXPOSE 8000
+ENTRYPOINT ["java", "-jar", "app.jar"]
