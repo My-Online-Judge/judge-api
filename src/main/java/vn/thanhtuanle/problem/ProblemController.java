@@ -3,9 +3,13 @@ package vn.thanhtuanle.problem;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -20,6 +24,7 @@ import vn.thanhtuanle.common.constant.AppProperties;
 import vn.thanhtuanle.common.constant.Routes;
 import vn.thanhtuanle.common.enums.ProblemStatus;
 import vn.thanhtuanle.problem.dto.CreateProblemDto;
+import vn.thanhtuanle.problem.dto.UpdateProblemDto;
 import vn.thanhtuanle.problem.dto.ProblemResponseDto;
 
 import java.io.IOException;
@@ -34,7 +39,8 @@ public class ProblemController {
     private final ProblemService problemService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Create a new problem")
+    @Operation(summary = "Create a new problem (admin only)")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ApiResponse<ProblemResponseDto> createProblem(
             @Valid @RequestPart(AppProperties.REQUEST_PART_DATA) CreateProblemDto dto,
             @RequestPart(AppProperties.REQUEST_PART_FILE) MultipartFile file) throws IOException {
@@ -62,5 +68,24 @@ public class ProblemController {
     public ApiResponse<ProblemResponseDto> getProblemBySlug(@PathVariable String slug) {
         log.info("Start get problem by slug: {}", slug);
         return ApiResponse.success(problemService.getProblemBySlug(slug));
+    }
+
+    @PutMapping("/{slug}")
+    @Operation(summary = "Update a problem's metadata (admin only)")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ApiResponse<ProblemResponseDto> updateProblem(
+            @PathVariable String slug,
+            @Valid @RequestBody UpdateProblemDto dto) {
+        log.info("Start update problem: {}", slug);
+        return ApiResponse.success(problemService.updateProblem(slug, dto));
+    }
+
+    @DeleteMapping("/{slug}")
+    @Operation(summary = "Delete a problem (admin only)")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ApiResponse<Void> deleteProblem(@PathVariable String slug) {
+        log.info("Start delete problem: {}", slug);
+        problemService.deleteProblem(slug);
+        return ApiResponse.success();
     }
 }

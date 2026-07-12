@@ -52,6 +52,6 @@ public interface ProblemRepository extends JpaRepository<Problem, UUID>, JpaSpec
             """, nativeQuery = true)
     Optional<ProblemStatisticProjection> findByProblemSlugWithStats(@Param("slug") String slug);
 
-    @Query(value = "SELECT result, count(*) as count FROM t_submissions WHERE problem_id = :problemId GROUP BY result", nativeQuery = true)
+    @Query(value = "SELECT status AS result, count(*) as count FROM t_submissions WHERE problem_id = :problemId GROUP BY status", nativeQuery = true)
     List<ProblemStatisticsInfo> countSubmissionsByResult(@Param("problemId") UUID problemId);
 }

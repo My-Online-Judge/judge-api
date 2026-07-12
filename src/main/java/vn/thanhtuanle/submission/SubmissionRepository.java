@@ -1,6 +1,5 @@
 package vn.thanhtuanle.submission;
 
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -13,8 +12,8 @@ import vn.thanhtuanle.entity.Submission;
 
 @Repository
 public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
-    @Query("SELECT s FROM Submission s JOIN FETCH s.problem WHERE s.problem.problemSlug = :slug ORDER BY s.createdAt DESC")
-    List<Submission> findByProblemSlugOrderByCreatedAtDesc(@Param("slug") String slug);
+    @Query("SELECT s FROM Submission s WHERE s.problem.problemSlug = :slug ORDER BY s.createdAt DESC")
+    Page<Submission> findByProblemSlugOrderByCreatedAtDesc(@Param("slug") String slug, Pageable pageable);
 
     @Query("""
                 SELECT s

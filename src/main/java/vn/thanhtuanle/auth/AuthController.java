@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import vn.thanhtuanle.auth.dto.AuthResponse;
 import vn.thanhtuanle.auth.dto.ExchangeTokenRequest;
@@ -25,7 +26,16 @@ import java.util.Map;
 @Slf4j
 public class AuthController {
 
+    private static final String ACCESS_TOKEN_COOKIE = "accessToken";
+    private static final String REFRESH_TOKEN_COOKIE = "refreshToken";
+    private static final int ACCESS_TOKEN_MAX_AGE = 24 * 60 * 60; // 1 day
+    private static final int REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
+
     private final AuthService authService;
+
+    /** Set true in prod (HTTPS) so auth cookies carry the Secure flag. */
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
 
     @Operation(summary = "Get Google Auth URL", description = "Get URL to redirect user to Google Login")
     @GetMapping("/outbound/google")
@@ -37,21 +47,8 @@ public class AuthController {
     @PostMapping("/logout")
     public ApiResponse<Void> logout(HttpServletResponse response) {
         authService.logout();
-
-        Cookie accessTokenCookie = new Cookie("accessToken", null);
-        accessTokenCookie.setHttpOnly(true);
-        accessTokenCookie.setSecure(false);
-        accessTokenCookie.setPath("/");
-        accessTokenCookie.setMaxAge(0);
-        response.addCookie(accessTokenCookie);
-
-        Cookie refreshTokenCookie = new Cookie("refreshToken", null);
-        refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(false);
-        refreshTokenCookie.setPath("/");
-        refreshTokenCookie.setMaxAge(0);
-        response.addCookie(refreshTokenCookie);
-
+        addCookie(response, ACCESS_TOKEN_COOKIE, null, 0);
+        addCookie(response, REFRESH_TOKEN_COOKIE, null, 0);
         return ApiResponse.success();
     }
 
@@ -66,23 +63,21 @@ public class AuthController {
     public ApiResponse<AuthResponse> loginGoogle(@Valid @RequestBody ExchangeTokenRequest request,
             HttpServletResponse response) {
         var authResponse = authService.authenticateGoogleUser(request.getCode());
+        addCookie(response, ACCESS_TOKEN_COOKIE, authResponse.getAccessToken(), ACCESS_TOKEN_MAX_AGE);
+        addCookie(response, REFRESH_TOKEN_COOKIE, authResponse.getRefreshToken(), REFRESH_TOKEN_MAX_AGE);
+        return ApiResponse.success(authResponse);
+    }
 
-        // Set Access Token Cookie
-        Cookie accessTokenCookie = new Cookie("accessToken", authResponse.getAccessToken());
-        accessTokenCookie.setHttpOnly(true);
-        accessTokenCookie.setSecure(false);
-        accessTokenCookie.setPath("/");
-        accessTokenCookie.setMaxAge(24 * 60 * 60); // 1 day
-        response.addCookie(accessTokenCookie);
-
-        // Set Refresh Token Cookie
-        Cookie refreshTokenCookie = new Cookie("refreshToken", authResponse.getRefreshToken());
-        refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(false);
-        refreshTokenCookie.setPath("/");
-        refreshTokenCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
-        response.addCookie(refreshTokenCookie);
-
+    @Operation(summary = "Refresh access token", description = "Exchange a valid refresh token for a new access token")
+    @PostMapping("/refresh")
+    public ApiResponse<AuthResponse> refresh(
+            @CookieValue(value = REFRESH_TOKEN_COOKIE, required = false) String refreshCookie,
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletResponse response) {
+        String refreshToken = refreshCookie != null ? refreshCookie
+                : (body != null ? body.get("refreshToken") : null);
+        var authResponse = authService.refreshAccessToken(refreshToken);
+        addCookie(response, ACCESS_TOKEN_COOKIE, authResponse.getAccessToken(), ACCESS_TOKEN_MAX_AGE);
         return ApiResponse.success(authResponse);
     }
 
@@ -91,5 +86,14 @@ public class AuthController {
     public ApiResponse<UserResponse> getMe() {
         log.info("Me request received");
         return ApiResponse.success(authService.me());
+    }
+
+    private void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
+        Cookie cookie = new Cookie(name, value);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(cookieSecure);
+        cookie.setPath("/");
+        cookie.setMaxAge(maxAge);
+        response.addCookie(cookie);
     }
 }

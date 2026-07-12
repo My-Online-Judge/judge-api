@@ -29,11 +29,20 @@ public class SubmissionController {
     }
 
     @GetMapping
-    @Operation(summary = "Get submissions by problem slug")
+    @Operation(summary = "Get submissions by problem slug (paginated)")
     public ApiResponse<List<SubmissionResponseDto>> getSubmissionsByProblemSlug(
-            @RequestParam(name = "problem") String problemSlug) {
+            @RequestParam(name = "problem") String problemSlug,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         log.info("Fetching submissions for problem slug: {}", problemSlug);
-        return ApiResponse.success(submissionService.getSubmissionsByProblemSlug(problemSlug));
+        return ApiResponse.success(submissionService.getSubmissionsByProblemSlug(problemSlug, page, size));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get a single submission by id")
+    public ApiResponse<SubmissionResponseDto> getSubmissionById(@PathVariable String id) {
+        log.info("Fetching submission by id: {}", id);
+        return ApiResponse.success(submissionService.getSubmissionById(id));
     }
 
     @GetMapping("/user/{userId}")

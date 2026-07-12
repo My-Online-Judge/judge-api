@@ -22,6 +22,7 @@ import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.TestCase;
 import vn.thanhtuanle.problem.dto.CreateProblemDto;
+import vn.thanhtuanle.problem.dto.UpdateProblemDto;
 import vn.thanhtuanle.problem.dto.ProblemResponseDto;
 import vn.thanhtuanle.problem.dto.ProblemStatisticProjection;
 import vn.thanhtuanle.problem.dto.ProblemStatisticsInfo;
@@ -168,5 +169,42 @@ public class ProblemService {
 
         log.info("End fetch problem details for slug: {}", slug);
         return dto;
+    }
+
+    @Transactional
+    public ProblemResponseDto updateProblem(String slug, UpdateProblemDto dto) {
+        log.info("Start update problem: {}", slug);
+        Problem problem = problemRepository.findByProblemSlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Problem not found with slug: " + slug));
+
+        problem.setTitle(dto.getTitle());
+        problem.setSubject(dto.getSubject());
+        problem.setDescription(dto.getDescription());
+        problem.setTimeLimit(dto.getTimeLimit());
+        problem.setMemoryLimit((long) dto.getMemoryLimit());
+        problem.setHardnessLevel(dto.getHardnessLevel());
+        problem.setInputDescription(dto.getInputDescription());
+        problem.setOutputDescription(dto.getOutputDescription());
+        problem.setSampleInput(dto.getSampleInput());
+        problem.setSampleOutput(dto.getSampleOutput());
+        problem.setHint(dto.getHint());
+        if (dto.getStatus() != null) {
+            problem.setStatus(dto.getStatus().getValue());
+        }
+
+        Problem saved = problemRepository.save(problem);
+        log.info("End update problem: {}", slug);
+        return problemMapper.toDto(saved);
+    }
+
+    @Transactional
+    public void deleteProblem(String slug) {
+        log.info("Start delete problem: {}", slug);
+        Problem problem = problemRepository.findByProblemSlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Problem not found with slug: " + slug));
+
+        problemRepository.delete(problem); // cascade + orphanRemoval clears test cases
+        FileUtil.deleteDirectoryQuietly(String.format("%s/%s", AppProperties.TEST_CASE_DIR, slug));
+        log.info("End delete problem: {}", slug);
     }
 }
