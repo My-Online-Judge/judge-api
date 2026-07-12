@@ -2,16 +2,13 @@ package vn.thanhtuanle.judge;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 import vn.thanhtuanle.common.constant.AppProperties;
-import vn.thanhtuanle.common.util.HashUtil;
 import vn.thanhtuanle.entity.Language;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.judge.dto.*;
+import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
 
 import java.util.List;
 
@@ -19,14 +16,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class JudgeService {
-
-    @Value("${judge.server.url}")
-    private String judgeServerUrl;
-
-    @Value("${judge.server.token}")
-    private String judgeServerToken;
-
-    private final RestClient.Builder restClientBuilder;
 
     private static final int MAX_CODE_LENGTH = 10240;
     private static final long BYTES_PER_MB = 1024L * 1024L;
@@ -60,8 +49,10 @@ public class JudgeService {
         log.info("End validate source code");
     }
 
-    public JudgeResponseDto judge(String sourceCode, Problem problem, Language language) {
-        log.info("Start judge source code for problem: {}", problem.getProblemSlug());
+    public SubmissionRequestedEvent buildRequestedEvent(String submissionId, String sourceCode,
+            Problem problem, Language language) {
+        log.info("Building judge request for problem: {}", problem.getProblemSlug());
+
         JudgeCompileConfigDto compileConfig = JudgeCompileConfigDto.builder()
                 .srcName(language.getSrcName())
                 .exeName(language.getExeName())
@@ -84,9 +75,8 @@ public class JudgeService {
                 .run(runConfig)
                 .build();
 
-        // Enforce the PROBLEM's own limits (not a flat per-language default):
-        // time_limit is already in ms; memory_limit is in MB and judge_server wants bytes.
-        JudgeSubmissionDto request = JudgeSubmissionDto.builder()
+        return SubmissionRequestedEvent.builder()
+                .submissionId(submissionId)
                 .src(sourceCode)
                 .languageConfig(languageConfig)
                 .maxCpuTime(problem.getTimeLimit())
@@ -94,15 +84,5 @@ public class JudgeService {
                 .testCaseId(problem.getProblemSlug())
                 .output(true)
                 .build();
-
-        log.info("Calling judge server at: {}", judgeServerUrl);
-        return restClientBuilder.build()
-                .post()
-                .uri(String.format("%s%s", judgeServerUrl, AppProperties.JUDGE_SERVER_ENDPOINT))
-                .header(AppProperties.X_JUDGE_SERVER_TOKEN, HashUtil.sha256Hex(judgeServerToken))
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(request)
-                .retrieve()
-                .body(JudgeResponseDto.class);
     }
 }
