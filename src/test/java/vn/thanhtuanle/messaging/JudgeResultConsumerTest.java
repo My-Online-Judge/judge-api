@@ -10,6 +10,9 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
 import vn.thanhtuanle.submission.SubmissionRepository;
+import vn.thanhtuanle.submission.SubmissionSseRegistry;
+import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
+import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -21,6 +24,8 @@ import static org.mockito.Mockito.*;
 class JudgeResultConsumerTest {
 
     @Mock SubmissionRepository submissionRepository;
+    @Mock SubmissionSseRegistry sseRegistry;
+    @Mock SubmissionMapper submissionMapper;
     @InjectMocks JudgeResultConsumer consumer;
 
     private Submission pending(UUID id) {
@@ -34,6 +39,9 @@ class JudgeResultConsumerTest {
         UUID id = UUID.randomUUID();
         Submission s = pending(id);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+        SubmissionResponseDto dto = SubmissionResponseDto.builder()
+                .status(SubmissionResult.ACCEPTED.getValue()).build();
+        when(submissionMapper.toDto(s)).thenReturn(dto);
 
         SubmissionJudgedEvent e = SubmissionJudgedEvent.builder()
                 .submissionId(id.toString()).status(SubmissionResult.ACCEPTED.getValue())
@@ -46,6 +54,7 @@ class JudgeResultConsumerTest {
         assertThat(s.getTime()).isEqualTo(15);
         assertThat(s.getMemory()).isEqualTo(3072L);
         verify(submissionRepository).save(s);
+        verify(sseRegistry).complete(id.toString(), dto);
     }
 
     @Test
@@ -62,5 +71,6 @@ class JudgeResultConsumerTest {
 
         assertThat(s.getStatus()).isEqualTo(SubmissionResult.ACCEPTED.getValue());
         verify(submissionRepository, never()).save(any());
+        verify(sseRegistry, never()).complete(any(), any());
     }
 }

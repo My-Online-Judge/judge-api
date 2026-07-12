@@ -6,7 +6,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import vn.thanhtuanle.common.constant.Routes;
 import vn.thanhtuanle.common.payload.ApiResponse;
@@ -20,6 +22,7 @@ import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 public class SubmissionController {
 
     private final SubmissionService submissionService;
+    private final SubmissionSseRegistry sseRegistry;
 
     @PostMapping
     @Operation(summary = "Submit a solution for a problem")
@@ -64,5 +67,12 @@ public class SubmissionController {
             @RequestParam(defaultValue = "10") int size) {
         log.info("Fetching submissions for user ID: {} and problem slug: {}", userId, problemSlug);
         return ApiResponse.success(submissionService.getSubmissionsByUserAndProblem(userId, problemSlug, page, size));
+    }
+
+    @GetMapping(value = "/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Stream the verdict for a submission via SSE")
+    public SseEmitter stream(@PathVariable String id) {
+        log.info("SSE subscribe for submission {}", id);
+        return sseRegistry.subscribe(id);
     }
 }

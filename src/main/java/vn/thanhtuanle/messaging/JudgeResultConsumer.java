@@ -9,6 +9,8 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
 import vn.thanhtuanle.submission.SubmissionRepository;
+import vn.thanhtuanle.submission.SubmissionSseRegistry;
+import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
 import java.util.UUID;
 
@@ -18,6 +20,8 @@ import java.util.UUID;
 public class JudgeResultConsumer {
 
     private final SubmissionRepository submissionRepository;
+    private final SubmissionSseRegistry sseRegistry;
+    private final SubmissionMapper submissionMapper;
 
     @KafkaListener(topics = KafkaTopics.SUBMISSION_JUDGED, groupId = "judge-api-results")
     @Transactional
@@ -41,6 +45,7 @@ public class JudgeResultConsumer {
         submission.setMemory(event.getMemory());
         submission.setErrorMessage(event.getErrorMessage());
         submissionRepository.save(submission);
+        sseRegistry.complete(event.getSubmissionId(), submissionMapper.toDto(submission));
         log.info("Applied verdict {} to submission {}", event.getStatus(), id);
     }
 }
