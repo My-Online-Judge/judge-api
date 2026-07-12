@@ -58,6 +58,22 @@ class JudgeResultConsumerTest {
     }
 
     @Test
+    void ignoresResult_whenStatusIsNull() {
+        UUID id = UUID.randomUUID();
+        Submission s = pending(id);
+        when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+
+        SubmissionJudgedEvent e = SubmissionJudgedEvent.builder()
+                .submissionId(id.toString()).status(null).build();
+
+        consumer.onJudged(e);
+
+        assertThat(s.getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
+        verify(submissionRepository, never()).save(any());
+        verify(sseRegistry, never()).complete(any(), any());
+    }
+
+    @Test
     void ignoresResult_whenAlreadyFinished() {
         UUID id = UUID.randomUUID();
         Submission s = Submission.builder().status(SubmissionResult.ACCEPTED.getValue()).build();

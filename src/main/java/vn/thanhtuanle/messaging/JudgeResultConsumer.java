@@ -38,6 +38,10 @@ public class JudgeResultConsumer {
                     id, submission.getStatus());
             return;
         }
+        if (event.getStatus() == null) {
+            log.warn("Received verdict with null status for submission {}, ignoring", id);
+            return;
+        }
         submission.setStatus(event.getStatus());
         submission.setResult(event.getResult());
         submission.setCpuTime(event.getCpuTime());

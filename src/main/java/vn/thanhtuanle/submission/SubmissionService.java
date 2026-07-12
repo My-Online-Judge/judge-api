@@ -2,6 +2,7 @@ package vn.thanhtuanle.submission;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -16,7 +17,7 @@ import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.judge.JudgeService;
-import vn.thanhtuanle.messaging.SubmissionEventPublisher;
+import vn.thanhtuanle.messaging.event.SubmissionRequestedAppEvent;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
 import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
@@ -39,7 +40,7 @@ public class SubmissionService {
     private final LanguageRepository languageRepository;
     private final SubmissionMapper submissionMapper;
     private final UserService userService;
-    private final SubmissionEventPublisher eventPublisher;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional
     public SubmissionResponseDto submit(SubmissionRequestDto req) {
@@ -57,7 +58,7 @@ public class SubmissionService {
 
         SubmissionRequestedEvent event = judgeService.buildRequestedEvent(
                 submission.getId().toString(), submission.getSourceCode(), problem, language);
-        eventPublisher.publishRequested(event);
+        applicationEventPublisher.publishEvent(new SubmissionRequestedAppEvent(event));
 
         log.info("Submission {} queued for judging", submission.getId());
         return submissionMapper.toDto(submission);

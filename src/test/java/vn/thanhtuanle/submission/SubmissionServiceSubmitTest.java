@@ -7,7 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.context.ApplicationEventPublisher;
 
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Language;
@@ -16,7 +16,7 @@ import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
-import vn.thanhtuanle.messaging.SubmissionEventPublisher;
+import vn.thanhtuanle.messaging.event.SubmissionRequestedAppEvent;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
 import vn.thanhtuanle.problem.ProblemRepository;
 import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
@@ -38,10 +38,9 @@ class SubmissionServiceSubmitTest {
     @Mock JudgeService judgeService;
     @Mock ProblemRepository problemRepository;
     @Mock LanguageRepository languageRepository;
-    @Mock ObjectMapper objectMapper;
     @Mock SubmissionMapper submissionMapper;
     @Mock UserService userService;
-    @Mock SubmissionEventPublisher eventPublisher;
+    @Mock ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks SubmissionService submissionService;
 
@@ -77,7 +76,7 @@ class SubmissionServiceSubmitTest {
         ArgumentCaptor<Submission> saved = ArgumentCaptor.forClass(Submission.class);
         verify(submissionRepository).save(saved.capture());
         assertThat(saved.getValue().getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
-        verify(eventPublisher).publishRequested(any(SubmissionRequestedEvent.class));
+        verify(applicationEventPublisher).publishEvent(any(SubmissionRequestedAppEvent.class));
         assertThat(dto.getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
     }
 }
