@@ -6,6 +6,19 @@ spring:
     name: backend-service
   profiles:
     active: @spring.profiles.active@
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: judge-api-results
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "vn.thanhtuanle.messaging.event"
+        spring.json.value.default.type: "vn.thanhtuanle.messaging.event.SubmissionJudgedEvent"
 
 management:
   endpoints:
