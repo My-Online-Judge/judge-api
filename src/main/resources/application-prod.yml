@@ -2,19 +2,55 @@ spring:
   config:
     activate:
       on-profile: prod
-  devtools:
-    add-properties: true
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
-    hibernate:
-      ddl-auto: update
-    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+    hibernate:
+      ddl-auto: update
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: ${GOOGLE_REDIRECT_URI}
+        provider:
+          google:
+            authorization-uri: ${GOOGLE_AUTH_URI}
+            token-uri: ${GOOGLE_TOKEN_URI}
+            user-info-uri: ${GOOGLE_USER_INFO_URI}
+
+server:
+  port: 8000
+
+judge:
+  server:
+    token: ${JUDGE_SERVER_TOKEN}
 
 springdoc:
   api-docs:
     enabled: false
   swagger-ui:
     enabled: false
+
+logging:
+  level:
+    vn.thanhtuanle: INFO
+  file:
+    name: log/app.log
+
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+      expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
+      refresh-token:
+        expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
