@@ -45,7 +45,7 @@ public interface ProblemRepository extends JpaRepository<Problem, UUID>, JpaSpec
     Page<ProblemStatisticProjection> findProblemsWithStats(String search, Integer status, Integer hardnessLevel,
             Pageable pageable);
 
-    @Query(value = "SELECT problem_id AS problemId, tag AS tag FROM t_problem_tags WHERE problem_id IN (:ids)", nativeQuery = true)
+    @Query(value = "SELECT problem_id AS problemId, tag AS tag FROM t_problem_tags WHERE problem_id IN (:ids) ORDER BY problem_id, tag", nativeQuery = true)
     List<ProblemTagRow> findTagsByProblemIds(@Param("ids") Collection<UUID> ids);
 
     @Query(value = """
