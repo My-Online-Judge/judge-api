@@ -35,8 +35,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.Arrays;
+
+import vn.thanhtuanle.problem.dto.ProblemTagRow;
 
 @Service
 @RequiredArgsConstructor
@@ -135,13 +138,29 @@ public class ProblemService {
         });
     }
 
-    public PageResponse<ProblemResponseDto> getProblems(int page, int size, String search, ProblemStatus status) {
+    public PageResponse<ProblemResponseDto> getProblems(int page, int size, String search, ProblemStatus status,
+            Integer hardnessLevel) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(AppProperties.DEFAULT_SORT_BY).descending());
 
         Integer statusValue = status != null ? status.getValue() : null;
-        Page<ProblemStatisticProjection> problemPage = problemRepository.findProblemsWithStats(search, statusValue,
-                pageable);
-        return PageResponse.of(problemPage.map(problemMapper::toDto));
+        Page<ProblemResponseDto> dtoPage = problemRepository
+                .findProblemsWithStats(search, statusValue, hardnessLevel, pageable)
+                .map(problemMapper::toDto);
+
+        attachTags(dtoPage.getContent());
+        return PageResponse.of(dtoPage);
+    }
+
+    private void attachTags(List<ProblemResponseDto> problems) {
+        if (problems.isEmpty()) {
+            return;
+        }
+        List<UUID> ids = problems.stream().map(ProblemResponseDto::getId).toList();
+        Map<UUID, List<String>> tagsByProblem = problemRepository.findTagsByProblemIds(ids).stream()
+                .collect(Collectors.groupingBy(
+                        ProblemTagRow::getProblemId,
+                        Collectors.mapping(ProblemTagRow::getTag, Collectors.toList())));
+        problems.forEach(p -> p.setTags(tagsByProblem.getOrDefault(p.getId(), List.of())));
     }
 
     public ProblemResponseDto getProblemBySlug(String slug) {

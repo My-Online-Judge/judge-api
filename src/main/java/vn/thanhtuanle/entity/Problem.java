@@ -1,8 +1,12 @@
 package vn.thanhtuanle.entity;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.*;
@@ -49,6 +53,12 @@ public class Problem extends BaseEntity {
     private String hint;
 
     private int status;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "t_problem_tags", joinColumns = @JoinColumn(name = "problem_id"))
+    @Column(name = "tag")
+    @Builder.Default
+    private List<String> tags = new ArrayList<>();
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

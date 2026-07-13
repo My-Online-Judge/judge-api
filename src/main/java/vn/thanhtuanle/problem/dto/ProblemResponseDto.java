@@ -1,5 +1,6 @@
 package vn.thanhtuanle.problem.dto;
 
+import java.util.List;
 import java.util.Map;
 
 import lombok.AllArgsConstructor;
@@ -31,4 +32,5 @@ public class ProblemResponseDto extends BaseResponse {
     private Integer totalSubmission;
     private Integer acceptedSubmission;
     private Map<String, Integer> statisticInfo;
+    private List<String> tags;
 }

@@ -57,10 +57,12 @@ public class ProblemController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) ProblemStatus status) {
+            @RequestParam(required = false) ProblemStatus status,
+            @RequestParam(required = false) Integer hardnessLevel) {
 
-        log.info("Start get problems: page={}, size={}, search={}, status={}", page, size, search, status);
-        return ApiResponse.success(problemService.getProblems(page, size, search, status));
+        log.info("Start get problems: page={}, size={}, search={}, status={}, hardnessLevel={}",
+                page, size, search, status, hardnessLevel);
+        return ApiResponse.success(problemService.getProblems(page, size, search, status, hardnessLevel));
     }
 
     @GetMapping("/{slug}")

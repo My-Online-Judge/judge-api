@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.problem.dto.ProblemStatisticProjection;
 import vn.thanhtuanle.problem.dto.ProblemStatisticsInfo;
+import vn.thanhtuanle.problem.dto.ProblemTagRow;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,13 +34,19 @@ public interface ProblemRepository extends JpaRepository<Problem, UUID>, JpaSpec
             WHERE (:search IS NULL OR p.title ILIKE CONCAT('%', :search, '%')
                    OR p.description ILIKE CONCAT('%', :search, '%'))
               AND (:status IS NULL OR p.status = :status)
+              AND (:hardnessLevel IS NULL OR p.hardness_level = :hardnessLevel)
             GROUP BY p.id
             """, countQuery = """
             SELECT count(*) FROM t_problems p
             WHERE (:search IS NULL OR p.title ILIKE CONCAT('%', :search, '%'))
               AND (:status IS NULL OR p.status = :status)
+              AND (:hardnessLevel IS NULL OR p.hardness_level = :hardnessLevel)
             """, nativeQuery = true)
-    Page<ProblemStatisticProjection> findProblemsWithStats(String search, Integer status, Pageable pageable);
+    Page<ProblemStatisticProjection> findProblemsWithStats(String search, Integer status, Integer hardnessLevel,
+            Pageable pageable);
+
+    @Query(value = "SELECT problem_id AS problemId, tag AS tag FROM t_problem_tags WHERE problem_id IN (:ids)", nativeQuery = true)
+    List<ProblemTagRow> findTagsByProblemIds(@Param("ids") Collection<UUID> ids);
 
     @Query(value = """
             SELECT
