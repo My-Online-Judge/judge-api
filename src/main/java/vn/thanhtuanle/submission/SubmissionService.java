@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.common.payload.PageResponse;
@@ -41,6 +42,7 @@ public class SubmissionService {
     private final SubmissionMapper submissionMapper;
     private final UserService userService;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final SubmissionSseRegistry sseRegistry;
 
     @Transactional
     public SubmissionResponseDto submit(SubmissionRequestDto req) {
@@ -98,6 +100,26 @@ public class SubmissionService {
         Submission submission = submissionRepository.findById(UUID.fromString(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + id));
         return submissionMapper.toDto(submission);
+    }
+
+    @Transactional(readOnly = true)
+    public SseEmitter streamVerdict(String id) {
+        // Register the emitter FIRST: if the verdict fires between here and the DB
+        // read, the consumer still finds this emitter. Then, if the submission is
+        // already terminal, replay the verdict now so a late subscriber isn't lost.
+        SseEmitter emitter = sseRegistry.subscribe(id);
+        Submission submission = submissionRepository.findById(UUID.fromString(id)).orElse(null);
+        if (submission == null) {
+            log.info("SSE subscribe for unknown submission {}, completing", id);
+            emitter.complete();
+            return emitter;
+        }
+        if (submission.getStatus() != SubmissionResult.PENDING.getValue()) {
+            log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
+                    id, submission.getStatus());
+            sseRegistry.complete(id, submissionMapper.toDto(submission));
+        }
+        return emitter;
     }
 
     @Transactional(readOnly = true)

@@ -41,6 +41,7 @@ class SubmissionServiceSubmitTest {
     @Mock SubmissionMapper submissionMapper;
     @Mock UserService userService;
     @Mock ApplicationEventPublisher applicationEventPublisher;
+    @Mock SubmissionSseRegistry sseRegistry;
 
     @InjectMocks SubmissionService submissionService;
 

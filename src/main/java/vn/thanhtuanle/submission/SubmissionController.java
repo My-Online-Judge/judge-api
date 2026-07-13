@@ -22,7 +22,6 @@ import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 public class SubmissionController {
 
     private final SubmissionService submissionService;
-    private final SubmissionSseRegistry sseRegistry;
 
     @PostMapping
     @Operation(summary = "Submit a solution for a problem")
@@ -73,6 +72,6 @@ public class SubmissionController {
     @Operation(summary = "Stream the verdict for a submission via SSE")
     public SseEmitter stream(@PathVariable String id) {
         log.info("SSE subscribe for submission {}", id);
-        return sseRegistry.subscribe(id);
+        return submissionService.streamVerdict(id);
     }
 }
