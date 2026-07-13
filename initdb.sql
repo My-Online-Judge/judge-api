@@ -452,3 +452,34 @@ ALTER TABLE ONLY public.t_test_cases
 
 \unrestrict Py8a0KqL1chN00bx7aavKMtEfLh6XociEcXU9VeRhVvCk9p00WbIlrFZYWO2be9
 
+
+--
+-- Name: t_problem_tags; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.t_problem_tags (
+    problem_id uuid NOT NULL,
+    tag character varying(255)
+);
+
+ALTER TABLE public.t_problem_tags OWNER TO postgres;
+
+--
+-- Data for Name: t_problem_tags; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.t_problem_tags (problem_id, tag) VALUES
+('6347d5d8-e782-468e-814f-52af5a2c8f57', 'Math'),
+('6347d5d8-e782-468e-814f-52af5a2c8f57', 'Strings'),
+('bb355243-e789-45ee-ad67-016a8ba1ee18', 'Math'),
+('bb355243-e789-45ee-ad67-016a8ba1ee18', 'Implementation'),
+('23408310-414d-4438-9844-dc8f15f04d47', 'Math'),
+('23408310-414d-4438-9844-dc8f15f04d47', 'Number Theory'),
+('23408310-414d-4438-9844-dc8f15f04d47', 'Greedy');
+
+--
+-- Name: t_problem_tags fk_problem_tags_problem; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.t_problem_tags
+    ADD CONSTRAINT fk_problem_tags_problem FOREIGN KEY (problem_id) REFERENCES public.t_problems(id);
