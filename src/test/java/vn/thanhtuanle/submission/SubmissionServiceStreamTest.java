@@ -78,6 +78,21 @@ class SubmissionServiceStreamTest {
     }
 
     @Test
+    void streamVerdict_whenJudging_doesNotReplay() {
+        UUID id = UUID.randomUUID();
+        Submission s = new Submission();
+        s.setId(id);
+        s.setStatus(SubmissionResult.JUDGING.getValue());
+        when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
+        when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+
+        submissionService.streamVerdict(id.toString());
+
+        verify(sseRegistry, never()).complete(any(), any());
+        verify(submissionMapper, never()).toDto(any(Submission.class));
+    }
+
+    @Test
     void streamVerdict_whenNotFound_completesEmitterWithoutVerdict() {
         UUID id = UUID.randomUUID();
         SseEmitter emitter = mock(SseEmitter.class);

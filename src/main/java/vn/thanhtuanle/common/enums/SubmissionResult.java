@@ -40,4 +40,8 @@ public enum SubmissionResult {
         }
         throw new IllegalArgumentException("Invalid SubmissionResult value: " + value);
     }
+
+    public static boolean isTerminal(int status) {
+        return status != PENDING.getValue() && status != JUDGING.getValue();
+    }
 }

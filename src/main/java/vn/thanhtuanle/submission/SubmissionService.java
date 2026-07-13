@@ -114,7 +114,7 @@ public class SubmissionService {
             emitter.complete();
             return emitter;
         }
-        if (submission.getStatus() != SubmissionResult.PENDING.getValue()) {
+        if (SubmissionResult.isTerminal(submission.getStatus())) {
             log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
                     id, submission.getStatus());
             sseRegistry.complete(id, submissionMapper.toDto(submission));

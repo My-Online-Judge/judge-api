@@ -33,7 +33,7 @@ public class JudgeResultConsumer {
             return;
         }
         // Idempotency: only the first terminal verdict wins; duplicates are ignored.
-        if (submission.getStatus() != SubmissionResult.PENDING.getValue()) {
+        if (SubmissionResult.isTerminal(submission.getStatus())) {
             log.info("Submission {} already finished (status={}), ignoring verdict",
                     id, submission.getStatus());
             return;
