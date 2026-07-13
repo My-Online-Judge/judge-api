@@ -174,6 +174,41 @@ public class AuthService {
         tokenRepository.deleteAllByUserId(user.getId());
     }
 
+    @Transactional
+    public AuthResponse refreshAccessToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+        }
+        try {
+            if (jwtUtil.isTokenExpired(refreshToken)) {
+                throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+            }
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+        }
+
+        var stored = tokenRepository.findByToken(refreshToken)
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS));
+        if (stored.isRevoked() || stored.isExpired() || stored.getTokenType() != TokenType.REFRESH) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+        }
+
+        String username = jwtUtil.extractUsername(refreshToken);
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        String newAccessToken = jwtUtil.generateToken(user);
+        savedUserToken(user, newAccessToken, TokenType.ACCESS);
+        log.info("Issued new access token via refresh for user: {}", username);
+
+        return AuthResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
+
     public UserResponse me() {
         log.info("Fetching current user information");
         var authentication = SecurityContextHolder.getContext().getAuthentication();

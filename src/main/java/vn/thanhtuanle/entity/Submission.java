@@ -26,6 +26,7 @@ public class Submission extends BaseEntity {
 
     private Integer result;
 
+    @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
     private Integer cpuTime;

@@ -1,4 +1,4 @@
-package vn.thanhtuanle.judge;
+package vn.thanhtuanle.messaging.event;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -11,7 +11,8 @@ import vn.thanhtuanle.judge.dto.JudgeLanguageConfigDto;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class JudgeSubmissionDto {
+public class SubmissionRequestedEvent {
+    private String submissionId;
     private String src;
 
     @JsonProperty("language_config")

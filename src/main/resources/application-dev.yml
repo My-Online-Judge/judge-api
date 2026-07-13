@@ -33,7 +33,6 @@ server:
 
 judge:
   server:
-    url: ${JUDGE_SERVER_URL}
     token: ${JUDGE_SERVER_TOKEN}
 
 springdoc:
