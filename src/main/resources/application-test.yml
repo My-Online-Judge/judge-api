@@ -12,6 +12,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  flyway:
+    # Tests run on in-memory H2 with the schema built from entities (ddl-auto above).
+    # The Flyway migrations are Postgres-specific, so Flyway stays off for the test profile.
+    enabled: false
 
 springdoc:
   api-docs:

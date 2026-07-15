@@ -20,6 +20,14 @@ spring:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "vn.thanhtuanle.messaging.event"
         spring.json.value.default.type: "vn.thanhtuanle.messaging.event.SubmissionJudgedEvent"
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # An already-populated DB (built previously by initdb.sql + ddl-auto) adopts Flyway by being
+    # baselined at V1 (its schema is assumed to match) and then only V2+ run. A fresh empty DB runs
+    # every migration from V1. Reference-data inserts in V2 are idempotent, so both paths are safe.
+    baseline-on-migrate: true
+    baseline-version: 1
 
 management:
   endpoints:
