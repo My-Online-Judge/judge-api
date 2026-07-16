@@ -55,7 +55,7 @@ public class JudgeServerController {
 
     @Operation(summary = "List registered judge servers and their health (admin only)")
     @GetMapping(Routes.JUDGE_SERVERS)
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAuthority('judgeserver:read')")
     public ApiResponse<List<JudgeServerResponseDto>> listJudgeServers() {
         return ApiResponse.success(judgeServerService.listServers());
     }

@@ -26,4 +26,5 @@ public class UserResponse extends BaseResponse {
     private String avatar;
     private String googleId;
     private Set<Role> roles;
+    private Set<String> permissions;
 }
