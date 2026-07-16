@@ -40,7 +40,7 @@ public class AuthController {
     @Operation(summary = "Get Google Auth URL", description = "Get URL to redirect user to Google Login")
     @GetMapping("/outbound/google")
     public ApiResponse<Map<String, String>> getGoogleAuthUrl() {
-        return ApiResponse.success(Map.of("url", authService.getGoogleAuthUrl()));
+        return ApiResponse.success(authService.getGoogleAuthUrl());
     }
 
     @Operation(summary = "Logout", description = "Logout user and clear cookies")

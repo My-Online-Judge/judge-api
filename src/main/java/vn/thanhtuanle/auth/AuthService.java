@@ -30,9 +30,12 @@ import vn.thanhtuanle.user.UserRepository;
 import vn.thanhtuanle.user.dto.UserResponse;
 import vn.thanhtuanle.user.mapper.UserMapper;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -64,10 +67,26 @@ public class AuthService {
     @Value("${spring.security.oauth2.client.provider.google.user-info-uri}")
     private String userInfoUri;
 
-    public String getGoogleAuthUrl() {
-        return authorizationUri + "?client_id=" + clientId +
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    /**
+     * Build the Google authorization URL together with a fresh, unguessable {@code state}.
+     * The frontend stores the state before redirecting and verifies it on the callback,
+     * which defends the login flow against CSRF / authorization-code injection.
+     */
+    public Map<String, String> getGoogleAuthUrl() {
+        String state = generateState();
+        String url = authorizationUri + "?client_id=" + clientId +
                 "&redirect_uri=" + redirectUri +
-                "&response_type=code&scope=email%20profile%20openid&access_type=offline";
+                "&response_type=code&scope=email%20profile%20openid&access_type=offline" +
+                "&state=" + state;
+        return Map.of("url", url, "state", state);
+    }
+
+    private String generateState() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     @Transactional
