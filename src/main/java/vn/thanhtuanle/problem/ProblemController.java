@@ -40,7 +40,7 @@ public class ProblemController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Create a new problem (admin only)")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAuthority('problem:create')")
     public ApiResponse<ProblemResponseDto> createProblem(
             @Valid @RequestPart(AppProperties.REQUEST_PART_DATA) CreateProblemDto dto,
             @RequestPart(AppProperties.REQUEST_PART_FILE) MultipartFile file) throws IOException {
@@ -74,7 +74,7 @@ public class ProblemController {
 
     @PutMapping("/{slug}")
     @Operation(summary = "Update a problem's metadata (admin only)")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAuthority('problem:update')")
     public ApiResponse<ProblemResponseDto> updateProblem(
             @PathVariable String slug,
             @Valid @RequestBody UpdateProblemDto dto) {
@@ -84,7 +84,7 @@ public class ProblemController {
 
     @DeleteMapping("/{slug}")
     @Operation(summary = "Delete a problem (admin only)")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasAuthority('problem:delete')")
     public ApiResponse<Void> deleteProblem(@PathVariable String slug) {
         log.info("Start delete problem: {}", slug);
         problemService.deleteProblem(slug);
