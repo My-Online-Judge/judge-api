@@ -4,9 +4,13 @@ import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import vn.thanhtuanle.entity.Permission;
+import vn.thanhtuanle.entity.Role;
 import vn.thanhtuanle.entity.User;
 
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Data
@@ -20,8 +24,19 @@ public class SecurityUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return user.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority(role.getName()))
+        Set<String> authorities = new HashSet<>();
+        if (user.getRoles() != null) {
+            for (Role role : user.getRoles()) {
+                authorities.add(role.getName());
+                if (role.getPermissions() != null) {
+                    for (Permission permission : role.getPermissions()) {
+                        authorities.add(permission.getName());
+                    }
+                }
+            }
+        }
+        return authorities.stream()
+                .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
     }
 
