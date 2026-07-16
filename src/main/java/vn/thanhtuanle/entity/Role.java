@@ -1,5 +1,6 @@
 package vn.thanhtuanle.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -23,6 +24,7 @@ public class Role extends BaseEntity {
     private String name;
     private String description;
 
+    @JsonIgnore
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "t_roles_permissions",
             joinColumns = @JoinColumn(name = "role_id"),
