@@ -8,6 +8,7 @@ public class Routes {
     public static final String BASE_API = "/api/v1";
 
     public static final String PROBLEMS = BASE_API + "/problems";
+    public static final String PROBLEM_TEST_CASES = PROBLEMS + "/{slug}/test-cases";
     public static final String SUBMISSIONS = BASE_API + "/submissions";
     public static final String LANGUAGES = BASE_API + "/languages";
     public static final String AUTH = BASE_API + "/auth";
