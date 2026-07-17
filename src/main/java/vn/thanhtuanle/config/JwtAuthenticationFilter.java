@@ -15,6 +15,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import vn.thanhtuanle.auth.TokenBlocklist;
 import vn.thanhtuanle.common.util.JwtUtil;
 
 import java.io.IOException;
@@ -26,6 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
+    private final TokenBlocklist tokenBlocklist;
 
     @Override
     protected void doFilterInternal(
@@ -55,15 +57,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             final String userName = jwtUtil.extractUsername(token);
             if (userName != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userName);
-                if (jwtUtil.isTokenValid(token, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities());
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                // Cheap Redis check first: a revoked token is refused without touching the DB.
+                if (tokenBlocklist.isBlocked(jwtUtil.extractJti(token))) {
+                    log.debug("Rejecting revoked (blocklisted) token for {}", userName);
+                } else {
+                    UserDetails userDetails = this.userDetailsService.loadUserByUsername(userName);
+                    if (jwtUtil.isTokenValid(token, userDetails)) {
+                        // The raw token rides in credentials so logout can extract its jti and revoke it.
+                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                token,
+                                userDetails.getAuthorities());
+                        authToken.setDetails(
+                                new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                    }
                 }
             }
         } catch (Exception ex) {
