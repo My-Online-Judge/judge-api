@@ -11,7 +11,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * In-memory registry of SSE subscribers keyed by submissionId.
- * NOTE: single-instance only; multi-instance fan-out would need a shared bus (out of scope).
+ *
+ * <p>Deliberately instance-local: it only holds emitters for connections terminated by THIS
+ * instance. Cross-instance delivery is handled upstream by {@code VerdictPubSub}, which broadcasts
+ * every verdict over Redis so each instance calls {@link #complete} — a no-op on instances that
+ * don't hold the emitter.
  */
 @Component
 @Slf4j

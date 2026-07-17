@@ -1,5 +1,8 @@
 package vn.thanhtuanle.submission;
 
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -12,6 +15,11 @@ import vn.thanhtuanle.entity.Submission;
 
 @Repository
 public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
+
+    /** Non-terminal submissions (PENDING/JUDGING) created before the given threshold — stuck. */
+    @Query("SELECT s FROM Submission s WHERE s.status IN :statuses AND s.createdAt < :threshold")
+    List<Submission> findStuck(@Param("statuses") Collection<Integer> statuses,
+                               @Param("threshold") LocalDateTime threshold);
     @Query("SELECT s FROM Submission s WHERE s.problem.problemSlug = :slug ORDER BY s.createdAt DESC")
     Page<Submission> findByProblemSlugOrderByCreatedAtDesc(@Param("slug") String slug, Pageable pageable);
 

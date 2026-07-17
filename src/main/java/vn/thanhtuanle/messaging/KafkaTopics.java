@@ -5,4 +5,6 @@ public final class KafkaTopics {
 
     public static final String SUBMISSION_REQUESTED = "submission.requested";
     public static final String SUBMISSION_JUDGED = "submission.judged";
+    // Dead-letter topic: verdicts that repeatedly fail to process land here instead of being dropped.
+    public static final String SUBMISSION_JUDGED_DLQ = "submission.judged.dlq";
 }

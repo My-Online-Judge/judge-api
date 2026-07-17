@@ -10,7 +10,6 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
 import vn.thanhtuanle.submission.SubmissionRepository;
-import vn.thanhtuanle.submission.SubmissionSseRegistry;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
@@ -24,7 +23,7 @@ import static org.mockito.Mockito.*;
 class JudgeResultConsumerTest {
 
     @Mock SubmissionRepository submissionRepository;
-    @Mock SubmissionSseRegistry sseRegistry;
+    @Mock VerdictPubSub verdictPubSub;
     @Mock SubmissionMapper submissionMapper;
     @InjectMocks JudgeResultConsumer consumer;
 
@@ -54,7 +53,7 @@ class JudgeResultConsumerTest {
         assertThat(s.getTime()).isEqualTo(15);
         assertThat(s.getMemory()).isEqualTo(3072L);
         verify(submissionRepository).save(s);
-        verify(sseRegistry).complete(id.toString(), dto);
+        verify(verdictPubSub).publish(id.toString(), dto);
     }
 
     @Test
@@ -70,7 +69,7 @@ class JudgeResultConsumerTest {
 
         assertThat(s.getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
         verify(submissionRepository, never()).save(any());
-        verify(sseRegistry, never()).complete(any(), any());
+        verify(verdictPubSub, never()).publish(any(), any());
     }
 
     @Test
@@ -87,6 +86,6 @@ class JudgeResultConsumerTest {
 
         assertThat(s.getStatus()).isEqualTo(SubmissionResult.ACCEPTED.getValue());
         verify(submissionRepository, never()).save(any());
-        verify(sseRegistry, never()).complete(any(), any());
+        verify(verdictPubSub, never()).publish(any(), any());
     }
 }

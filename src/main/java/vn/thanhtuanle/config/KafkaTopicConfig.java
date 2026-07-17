@@ -41,4 +41,12 @@ public class KafkaTopicConfig {
                 .replicas(1)
                 .build();
     }
+
+    @Bean
+    public NewTopic submissionJudgedDlqTopic() {
+        return TopicBuilder.name(KafkaTopics.SUBMISSION_JUDGED_DLQ)
+                .partitions(partitions)
+                .replicas(1)
+                .build();
+    }
 }

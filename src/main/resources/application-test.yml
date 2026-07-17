@@ -16,6 +16,29 @@ spring:
     # Tests run on in-memory H2 with the schema built from entities (ddl-auto above).
     # The Flyway migrations are Postgres-specific, so Flyway stays off for the test profile.
     enabled: false
+  # Dummy OAuth/JWT config so the full application context loads under @SpringBootTest without
+  # real secrets or a live provider (no network calls happen at context-load time).
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-client-id
+            client-secret: test-client-secret
+            redirect-uri: http://localhost/login/oauth2/code/google
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+
+application:
+  security:
+    jwt:
+      secret-key: 6250655368566B5970337336763979244226452948404D635166546A576E5A71
+      expiration: 86400000
+      refresh-token:
+        expiration: 259200000
 
 springdoc:
   api-docs:
