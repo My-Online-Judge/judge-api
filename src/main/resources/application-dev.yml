@@ -60,3 +60,11 @@ application:
       expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
       refresh-token:
         expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
+
+app:
+  # Where the browser is sent back to after Google redirects to this API.
+  # Change this (not the Google Console) when the SPA moves port/host.
+  base-url: ${APP_BASE_URL:http://localhost:5173}
+  cookie:
+    # true behind HTTPS so the auth cookies carry Secure.
+    secure: ${COOKIE_SECURE:false}

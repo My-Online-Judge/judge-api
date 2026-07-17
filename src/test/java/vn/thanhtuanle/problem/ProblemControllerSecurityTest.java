@@ -14,6 +14,7 @@ import vn.thanhtuanle.common.util.JwtUtil;
 import vn.thanhtuanle.config.CustomAccessDeniedHandler;
 import vn.thanhtuanle.config.CustomAuthenticationEntryPoint;
 import vn.thanhtuanle.config.JwtAuthenticationFilter;
+import vn.thanhtuanle.auth.TokenBlocklist;
 import vn.thanhtuanle.config.SecurityConfig;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -34,6 +35,8 @@ class ProblemControllerSecurityTest {
     private JwtUtil jwtUtil;
     @MockBean
     private UserDetailsService userDetailsService;
+    @MockBean
+    private TokenBlocklist tokenBlocklist;
 
     @Test
     @WithMockUser(authorities = "problem:delete")

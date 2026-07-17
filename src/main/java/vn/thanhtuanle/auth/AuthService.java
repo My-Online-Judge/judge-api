@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -48,6 +49,8 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final UserMapper userMapper;
     private final RestTemplate restTemplate;
+    private final TokenBlocklist tokenBlocklist;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String clientId;
@@ -178,6 +181,39 @@ public class AuthService {
                 .build();
     }
 
+    /**
+     * Username + password login. For password accounts (e.g. the seeded admin) — Google-only
+     * users have no password and fall through to the same generic error, so this endpoint can't
+     * be used to tell a real username from a wrong password. Mirrors the Google flow's token
+     * bookkeeping; the caller sets the returned tokens as HttpOnly cookies.
+     */
+    @Transactional
+    public AuthResponse authenticateWithPassword(String username, String password) {
+        User user = userRepository.findByUsername(username)
+                .filter(u -> u.getPassword() != null && passwordEncoder.matches(password, u.getPassword()))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (user.getStatus() == null || user.getStatus() != CommonStatus.ACTIVE.getValue()) {
+            throw new AppException(ErrorCode.USER_BLOCKED);
+        }
+
+        String accessToken = jwtUtil.generateToken(user);
+        String refreshToken = jwtUtil.generateRefreshToken(user);
+
+        revokeAllUserTokens(user);
+        savedUserToken(user, accessToken, TokenType.ACCESS);
+        savedUserToken(user, refreshToken, TokenType.REFRESH);
+
+        user.setLastLogin(LocalDateTime.now());
+        userRepository.save(user);
+
+        log.info("Password login for user: {}", username);
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
+
     private void savedUserToken(User user, String jwtToken, TokenType tokenType) {
         var token = Token.builder()
                 .user(user)
@@ -254,6 +290,13 @@ public class AuthService {
                     log.warn("User not found with username: {}", username);
                     return new AppException(ErrorCode.USER_NOT_EXISTED);
                 });
+
+        // Revoke the access token the caller is holding right now: park its jti in Redis until it
+        // would have expired, so JwtAuthenticationFilter refuses it immediately (the DB revoke below
+        // only invalidates refresh tokens — the filter never consults the DB).
+        if (authentication.getCredentials() instanceof String accessToken) {
+            tokenBlocklist.block(jwtUtil.extractJti(accessToken), jwtUtil.getRemainingTtlMillis(accessToken));
+        }
 
         revokeAllUserTokens(user);
         log.info("User logged out successfully");
