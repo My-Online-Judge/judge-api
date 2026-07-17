@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
+import vn.thanhtuanle.messaging.VerdictPubSub;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
 import java.time.LocalDateTime;
@@ -29,7 +30,7 @@ import java.util.List;
 public class SubmissionReconcileJob {
 
     private final SubmissionRepository submissionRepository;
-    private final SubmissionSseRegistry sseRegistry;
+    private final VerdictPubSub verdictPubSub;
     private final SubmissionMapper submissionMapper;
 
     @Value("${judge.stuck-timeout-min:5}")
@@ -50,7 +51,7 @@ public class SubmissionReconcileJob {
             submission.setErrorMessage(
                     "Judging timed out: no verdict within " + stuckTimeoutMin + " minutes");
             submissionRepository.save(submission);
-            sseRegistry.complete(submission.getId().toString(), submissionMapper.toDto(submission));
+            verdictPubSub.publish(submission.getId().toString(), submissionMapper.toDto(submission));
             log.warn("Reconciled stuck submission {} -> SYSTEM_ERROR", submission.getId());
         }
         log.info("Reconcile flipped {} stuck submission(s) to SYSTEM_ERROR", stuck.size());

@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
+import vn.thanhtuanle.messaging.VerdictPubSub;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
@@ -29,7 +30,7 @@ import static org.mockito.Mockito.when;
 class SubmissionReconcileJobTest {
 
     @Mock SubmissionRepository submissionRepository;
-    @Mock SubmissionSseRegistry sseRegistry;
+    @Mock VerdictPubSub verdictPubSub;
     @Mock SubmissionMapper submissionMapper;
     @InjectMocks SubmissionReconcileJob job;
 
@@ -54,7 +55,7 @@ class SubmissionReconcileJobTest {
         assertThat(stuck.getStatus()).isEqualTo(SubmissionResult.SYSTEM_ERROR.getValue());
         assertThat(stuck.getErrorMessage()).contains("timed out");
         verify(submissionRepository).save(stuck);
-        verify(sseRegistry).complete(id.toString(), dto);
+        verify(verdictPubSub).publish(id.toString(), dto);
     }
 
     @Test
@@ -65,7 +66,7 @@ class SubmissionReconcileJobTest {
         job.reconcileStuck();
 
         verify(submissionRepository, never()).save(any());
-        verify(sseRegistry, never()).complete(any(), any());
+        verify(verdictPubSub, never()).publish(any(), any());
     }
 
     @Test
