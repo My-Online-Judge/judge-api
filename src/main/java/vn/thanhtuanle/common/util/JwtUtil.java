@@ -16,6 +16,7 @@ import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -32,6 +33,23 @@ public class JwtUtil {
 
     public String extractUsername(String jwtToken) {
         return extractClaims(jwtToken, Claims::getSubject);
+    }
+
+    /** The token's unique id (jti) — the key under which a revoked token is tracked in Redis. */
+    public String extractJti(String jwtToken) {
+        return extractClaims(jwtToken, Claims::getId);
+    }
+
+    /**
+     * Milliseconds left until this token expires, clamped to 0. Used as the TTL when a token's
+     * jti is parked in Redis so the entry self-evicts exactly when the token would have expired.
+     */
+    public long getRemainingTtlMillis(String jwtToken) {
+        try {
+            return Math.max(0, extractExpiration(jwtToken).getTime() - System.currentTimeMillis());
+        } catch (ExpiredJwtException e) {
+            return 0;
+        }
     }
 
     public <T> T extractClaims(String token, Function<Claims, T> claimsResolver) {
@@ -61,6 +79,7 @@ public class JwtUtil {
         return Jwts
                 .builder()
                 .setClaims(extractClaims)
+                .setId(UUID.randomUUID().toString())
                 .setSubject(user.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))

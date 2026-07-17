@@ -48,6 +48,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final UserMapper userMapper;
     private final RestTemplate restTemplate;
+    private final TokenBlocklist tokenBlocklist;
 
     @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String clientId;
@@ -254,6 +255,13 @@ public class AuthService {
                     log.warn("User not found with username: {}", username);
                     return new AppException(ErrorCode.USER_NOT_EXISTED);
                 });
+
+        // Revoke the access token the caller is holding right now: park its jti in Redis until it
+        // would have expired, so JwtAuthenticationFilter refuses it immediately (the DB revoke below
+        // only invalidates refresh tokens — the filter never consults the DB).
+        if (authentication.getCredentials() instanceof String accessToken) {
+            tokenBlocklist.block(jwtUtil.extractJti(accessToken), jwtUtil.getRemainingTtlMillis(accessToken));
+        }
 
         revokeAllUserTokens(user);
         log.info("User logged out successfully");
