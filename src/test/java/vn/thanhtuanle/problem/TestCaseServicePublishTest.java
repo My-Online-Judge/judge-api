@@ -29,14 +29,14 @@ class TestCaseServicePublishTest {
     void deleteTestCase_republishesBundleToMinio() {
         UUID id = UUID.randomUUID();
         Problem problem = new Problem();
-        problem.setProblemSlug("simple-a-plus-b");
-        TestCase tc = TestCase.builder().input("simple-a-plus-b/1.in")
-                .output("simple-a-plus-b/1.out").problem(problem).build();
+        problem.setProblemSlug("no-such-slug");
+        TestCase tc = TestCase.builder().input("no-such-slug/1.in")
+                .output("no-such-slug/1.out").problem(problem).build();
         when(testCaseRepository.findById(id)).thenReturn(Optional.of(tc));
 
-        testCaseService.deleteTestCase("simple-a-plus-b", id);
+        testCaseService.deleteTestCase("no-such-slug", id);
 
-        verify(infoGenerator).generateInfo("simple-a-plus-b");
-        verify(bundleStore).publish(eq("simple-a-plus-b"));
+        verify(infoGenerator).generateInfo("no-such-slug");
+        verify(bundleStore).publish(eq("no-such-slug"));
     }
 }
