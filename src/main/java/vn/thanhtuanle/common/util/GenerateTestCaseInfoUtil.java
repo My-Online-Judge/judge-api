@@ -3,7 +3,6 @@ package vn.thanhtuanle.common.util;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -30,7 +29,9 @@ public class GenerateTestCaseInfoUtil {
      * @param problemSlug Slug of problem
      */
 
-    @Async
+    // Runs SYNCHRONOUSLY (was @Async): TestCaseBundleStore.publish() zips this directory right
+    // after we return, and content-addressed bundles must observe the freshly written `info`. An
+    // async write would let publish() race ahead and freeze a bundle with a missing/stale info.
     public void generateInfo(String problemSlug) {
         if (!StringUtils.hasText(problemSlug)) {
             log.warn("Problem slug is empty, skipping generate info");
