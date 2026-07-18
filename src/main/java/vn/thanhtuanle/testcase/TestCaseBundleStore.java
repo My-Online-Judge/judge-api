@@ -8,6 +8,7 @@ import io.minio.PutObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import vn.thanhtuanle.common.constant.AppProperties;
 
@@ -41,6 +42,7 @@ public class TestCaseBundleStore {
     private final MinioProperties props;
     private final Path baseDir;
 
+    @Autowired
     public TestCaseBundleStore(MinioClient minio, MinioProperties props) {
         this(minio, props, Paths.get(AppProperties.TEST_CASE_DIR));
     }
