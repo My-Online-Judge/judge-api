@@ -9,5 +9,6 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=builder /app/target/backend-service.jar app.jar
+COPY --from=builder /app/src/main/resources/test_cases ./src/main/resources/test_cases
 EXPOSE 8000
 ENTRYPOINT ["java", "-jar", "app.jar"]
