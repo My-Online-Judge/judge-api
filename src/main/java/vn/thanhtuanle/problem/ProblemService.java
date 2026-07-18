@@ -49,6 +49,7 @@ public class ProblemService {
     private final ProblemRepository problemRepository;
     private final ProblemMapper problemMapper;
     private final GenerateTestCaseInfoUtil infoGenerator;
+    private final vn.thanhtuanle.testcase.TestCaseBundleStore bundleStore;
 
     @Transactional
     public ProblemResponseDto createProblem(CreateProblemDto dto, MultipartFile zipFile) throws IOException {
@@ -71,6 +72,7 @@ public class ProblemService {
         problem.getTestCases().sort(Comparator.comparing(TestCase::getInput));
 
         Problem savedProblem = problemRepository.save(problem);
+        bundleStore.publish(dto.getProblemSlug().trim());
         log.info("Problem created successfully with ID: {}", savedProblem.getId());
         return problemMapper.toDto(savedProblem);
     }

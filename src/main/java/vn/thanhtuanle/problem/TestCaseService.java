@@ -41,6 +41,7 @@ public class TestCaseService {
     private final ProblemRepository problemRepository;
     private final TestCaseRepository testCaseRepository;
     private final GenerateTestCaseInfoUtil infoGenerator;
+    private final vn.thanhtuanle.testcase.TestCaseBundleStore bundleStore;
 
     private static final Comparator<TestCaseResponse> BY_NUMERIC_NAME =
             Comparator.comparingInt(r -> parseIntOrMax(r.getName()));
@@ -79,6 +80,7 @@ public class TestCaseService {
 
         problemRepository.save(problem);
         infoGenerator.generateInfo(slug);
+        bundleStore.publish(slug);
 
         log.info("End add test case for problem: {} as index {}", slug, index);
         return toResponse(created, inBytes, outBytes);
@@ -126,6 +128,7 @@ public class TestCaseService {
 
         problemRepository.save(problem);
         infoGenerator.generateInfo(slug);
+        bundleStore.publish(slug);
 
         List<TestCaseResponse> responses = new ArrayList<>();
         for (int i = 0; i < newCases.size(); i++) {
@@ -151,6 +154,7 @@ public class TestCaseService {
         deleteFileQuietly(tc.getOutput());
         testCaseRepository.delete(tc);
         infoGenerator.generateInfo(slug);
+        bundleStore.publish(slug);
         log.info("End delete test case {} for problem: {}", testCaseId, slug);
     }
 
