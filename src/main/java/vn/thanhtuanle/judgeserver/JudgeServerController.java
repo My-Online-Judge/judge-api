@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import vn.thanhtuanle.common.constant.AppProperties;
 import vn.thanhtuanle.common.constant.Routes;
 import vn.thanhtuanle.common.payload.ApiResponse;
+import vn.thanhtuanle.common.util.ClientIpResolver;
 import vn.thanhtuanle.judgeserver.dto.JudgeServerHeartbeatDto;
 import vn.thanhtuanle.judgeserver.dto.JudgeServerResponseDto;
 
@@ -42,7 +43,7 @@ public class JudgeServerController {
             @RequestHeader(value = AppProperties.X_JUDGE_SERVER_TOKEN, required = false) String token,
             HttpServletRequest request) {
 
-        boolean accepted = judgeServerService.handleHeartbeat(dto, token, resolveClientIp(request));
+        boolean accepted = judgeServerService.handleHeartbeat(dto, token, ClientIpResolver.resolve(request));
         if (!accepted) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.<Void>builder()
@@ -58,13 +59,5 @@ public class JudgeServerController {
     @PreAuthorize("hasAuthority('judgeserver:read')")
     public ApiResponse<List<JudgeServerResponseDto>> listJudgeServers() {
         return ApiResponse.success(judgeServerService.listServers());
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }
