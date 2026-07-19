@@ -164,6 +164,11 @@ public class AuthService {
             userRepository.save(user);
         }
 
+        // Only active accounts may log in (disabled/soft-deleted users are blocked).
+        if (user.getStatus() == null || user.getStatus() != CommonStatus.ACTIVE.getValue()) {
+            throw new AppException(ErrorCode.USER_BLOCKED);
+        }
+
         // 4. Generate Tokens
         var jwtToken = jwtUtil.generateToken(user);
         var refreshToken = jwtUtil.generateRefreshToken(user);
