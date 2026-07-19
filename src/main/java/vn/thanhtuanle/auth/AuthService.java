@@ -268,6 +268,9 @@ public class AuthService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         String newAccessToken = jwtUtil.generateToken(user);
+        // One ACCESS row per live session: at a 15-minute TTL, appending a row per
+        // refresh would add ~96 rows/user/day that nothing cleans up until the next login.
+        tokenRepository.deleteAllByUserIdAndTokenType(user.getId(), TokenType.ACCESS);
         savedUserToken(user, newAccessToken, TokenType.ACCESS, meta);
         log.info("Issued new access token via refresh for user: {}", username);
 
