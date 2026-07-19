@@ -24,8 +24,9 @@ import java.util.regex.Pattern;
 public class RoleService {
 
     private static final String ADMIN_ROLE = "ADMIN";
+    private static final String SYS_ROOT_ROLE = "SYS_ROOT";
     // Seeded roles referenced by code/seed data — they cannot be deleted.
-    private static final Set<String> SYSTEM_ROLES = Set.of("ADMIN", "USER");
+    private static final Set<String> SYSTEM_ROLES = Set.of("ADMIN", "USER", "SYS_ROOT");
     private static final Pattern ROLE_NAME = Pattern.compile("^[A-Z][A-Z0-9_]*$");
 
     private final RoleRepository roleRepository;
@@ -90,7 +91,7 @@ public class RoleService {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_EXISTED));
 
-        if (ADMIN_ROLE.equals(role.getName())) {
+        if (ADMIN_ROLE.equals(role.getName()) || SYS_ROOT_ROLE.equals(role.getName())) {
             throw new AppException(ErrorCode.ROLE_IMMUTABLE);
         }
 
