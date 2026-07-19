@@ -22,7 +22,6 @@ import vn.thanhtuanle.user.dto.UserResponse;
 import vn.thanhtuanle.user.mapper.UserMapper;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -55,11 +54,8 @@ public class UserService {
     public PageResponse<UserResponse> list(int page, int size, String search, Integer status, UUID roleId,
             LocalDate createdFrom, LocalDate createdTo) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        String q = (search == null || search.isBlank()) ? null : search.trim().toLowerCase();
-        LocalDateTime from = createdFrom == null ? null : createdFrom.atStartOfDay();
-        LocalDateTime to = createdTo == null ? null : createdTo.plusDays(1).atStartOfDay();
-
-        Page<UserResponse> dtoPage = userRepository.search(q, status, roleId, from, to, pageable)
+        Page<UserResponse> dtoPage = userRepository
+                .findAll(UserSpecifications.filter(search, status, roleId, createdFrom, createdTo), pageable)
                 .map(userMapper::toResponse);
         return PageResponse.of(dtoPage);
     }

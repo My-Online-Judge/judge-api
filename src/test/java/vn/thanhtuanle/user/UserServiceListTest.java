@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import vn.thanhtuanle.common.exception.AppException;
 import vn.thanhtuanle.common.exception.ErrorCode;
 import vn.thanhtuanle.common.payload.PageResponse;
@@ -16,7 +17,6 @@ import vn.thanhtuanle.user.dto.UserResponse;
 import vn.thanhtuanle.user.mapper.UserMapper;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,8 +24,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,14 +37,13 @@ class UserServiceListTest {
     @InjectMocks UserService userService;
 
     @Test
-    void list_lowercasesSearch_convertsDayBounds_mapsResults() {
+    @SuppressWarnings("unchecked")
+    void list_queriesBySpecification_mapsResults() {
         User user = User.builder().username("alice").build();
         user.setId(UUID.randomUUID());
         Page<User> page = new PageImpl<>(List.of(user));
         UserResponse dto = new UserResponse();
-        when(userRepository.search(eq("ab"), isNull(), isNull(),
-                eq(LocalDate.of(2026, 7, 1).atStartOfDay()),
-                eq(LocalDate.of(2026, 7, 11).atStartOfDay()), any(Pageable.class))).thenReturn(page);
+        when(userRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
         when(userMapper.toResponse(user)).thenReturn(dto);
 
         PageResponse<UserResponse> result = userService.list(0, 10, "Ab", null, null,
@@ -54,17 +51,7 @@ class UserServiceListTest {
 
         assertThat(result.getData()).containsExactly(dto);
         assertThat(result.getTotalElements()).isEqualTo(1);
-    }
-
-    @Test
-    void list_blankSearch_passesNull() {
-        Page<User> page = new PageImpl<>(List.of());
-        when(userRepository.search(isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
-                .thenReturn(page);
-
-        userService.list(0, 10, "   ", null, null, null, null);
-
-        verify(userRepository).search(isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class));
+        verify(userRepository).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test
