@@ -106,7 +106,12 @@ public class TestCaseBundleStore {
             minio.statObject(StatObjectArgs.builder().bucket(props.getBucket()).object(key).build());
             return true;
         } catch (ErrorResponseException e) {
-            return false;
+            String code = e.errorResponse() != null ? e.errorResponse().code() : null;
+            if ("NoSuchKey".equals(code) || "NoSuchObject".equals(code)) {
+                return false;  // genuinely absent
+            }
+            // 403 AccessDenied, throttling, etc. must NOT read as "absent".
+            throw new TestCaseBundleException("Failed to stat object " + key + " (code=" + code + ")", e);
         } catch (Exception e) {
             throw new TestCaseBundleException("Failed to stat object " + key, e);
         }
