@@ -25,6 +25,15 @@ public class Token extends BaseEntity {
     private boolean revoked;
     private boolean expired;
 
+    @Column(length = 45)
+    private String ip;
+
+    @Column(name = "device_hash", length = 128)
+    private String deviceHash;
+
+    @Column(name = "user_agent", length = 512)
+    private String userAgent;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;

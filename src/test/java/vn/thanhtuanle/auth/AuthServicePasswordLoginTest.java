@@ -11,6 +11,7 @@ import vn.thanhtuanle.auth.dto.AuthResponse;
 import vn.thanhtuanle.common.enums.CommonStatus;
 import vn.thanhtuanle.common.exception.AppException;
 import vn.thanhtuanle.common.exception.ErrorCode;
+import vn.thanhtuanle.common.util.ClientMeta;
 import vn.thanhtuanle.common.util.JwtUtil;
 import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.repository.TokenRepository;
@@ -41,6 +42,7 @@ class AuthServicePasswordLoginTest {
     @InjectMocks AuthService authService;
 
     private static final String HASH = "$2a$10$hash";
+    private static final ClientMeta META = new ClientMeta("1.2.3.4", "dev-1", "probe/1.0");
 
     private User admin(Integer status, String password) {
         User u = User.builder().username("admin").password(password).status(status).build();
@@ -56,7 +58,7 @@ class AuthServicePasswordLoginTest {
         when(jwtUtil.generateToken(u)).thenReturn("AT");
         when(jwtUtil.generateRefreshToken(u)).thenReturn("RT");
 
-        AuthResponse res = authService.authenticateWithPassword("admin", "secret");
+        AuthResponse res = authService.authenticateWithPassword("admin", "secret", META);
 
         assertThat(res.getAccessToken()).isEqualTo("AT");
         assertThat(res.getRefreshToken()).isEqualTo("RT");
@@ -70,7 +72,7 @@ class AuthServicePasswordLoginTest {
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(u));
         when(passwordEncoder.matches("wrong", HASH)).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.authenticateWithPassword("admin", "wrong"))
+        assertThatThrownBy(() -> authService.authenticateWithPassword("admin", "wrong", META))
                 .isInstanceOfSatisfying(AppException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_EXISTED));
         verify(jwtUtil, never()).generateToken(any());
@@ -80,7 +82,7 @@ class AuthServicePasswordLoginTest {
     void unknownUser_sameGenericError_neverChecksPassword() {
         when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.authenticateWithPassword("ghost", "x"))
+        assertThatThrownBy(() -> authService.authenticateWithPassword("ghost", "x", META))
                 .isInstanceOfSatisfying(AppException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_EXISTED));
         verify(passwordEncoder, never()).matches(any(), any());
@@ -91,7 +93,7 @@ class AuthServicePasswordLoginTest {
         User u = admin(CommonStatus.ACTIVE.getValue(), null);
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(u));
 
-        assertThatThrownBy(() -> authService.authenticateWithPassword("admin", "x"))
+        assertThatThrownBy(() -> authService.authenticateWithPassword("admin", "x", META))
                 .isInstanceOf(AppException.class);
         verify(jwtUtil, never()).generateToken(any());
     }
@@ -102,7 +104,7 @@ class AuthServicePasswordLoginTest {
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(u));
         when(passwordEncoder.matches("secret", HASH)).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.authenticateWithPassword("admin", "secret"))
+        assertThatThrownBy(() -> authService.authenticateWithPassword("admin", "secret", META))
                 .isInstanceOfSatisfying(AppException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.USER_BLOCKED));
         verify(jwtUtil, never()).generateToken(any());
