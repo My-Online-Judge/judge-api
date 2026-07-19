@@ -26,6 +26,12 @@ public class User extends BaseEntity {
     private Boolean enabledMfa;
     private LocalDateTime lastLogin;
 
+    @Column(name = "last_login_ip", length = 45)
+    private String lastLoginIp;
+
+    @Column(name = "last_login_device_hash", length = 128)
+    private String lastLoginDeviceHash;
+
     @Column(name = "avatar")
     private String avatar;
 

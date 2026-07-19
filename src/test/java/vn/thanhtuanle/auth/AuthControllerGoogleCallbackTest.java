@@ -6,14 +6,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.util.ReflectionTestUtils;
 import vn.thanhtuanle.auth.dto.AuthResponse;
+import vn.thanhtuanle.common.util.ClientMeta;
 
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,20 +34,22 @@ class AuthControllerGoogleCallbackTest {
     AuthController controller;
 
     MockHttpServletResponse response;
+    HttpServletRequest request;
 
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(controller, "appBaseUrl", APP);
         ReflectionTestUtils.setField(controller, "cookieSecure", false);
         response = new MockHttpServletResponse();
+        request = mock(HttpServletRequest.class);
     }
 
     @Test
     void callback_withMatchingState_setsHttpOnlyAuthCookies_andReturnsBrowserToApp() throws IOException {
-        when(authService.authenticateGoogleUser("the-code"))
+        when(authService.authenticateGoogleUser(eq("the-code"), any(ClientMeta.class)))
                 .thenReturn(AuthResponse.builder().accessToken("AT").refreshToken("RT").build());
 
-        controller.googleCallback("the-code", "state-123", null, "state-123", response);
+        controller.googleCallback("the-code", "state-123", null, "state-123", request, response);
 
         assertThat(response.getRedirectedUrl()).isEqualTo(APP + "/problems?login=ok");
         assertThat(response.getCookie("accessToken").getValue()).isEqualTo("AT");
@@ -55,35 +61,35 @@ class AuthControllerGoogleCallbackTest {
 
     @Test
     void callback_withMismatchedState_isRejected_andNeverExchangesTheCode() throws IOException {
-        controller.googleCallback("the-code", "attacker-state", null, "expected-state", response);
+        controller.googleCallback("the-code", "attacker-state", null, "expected-state", request, response);
 
         assertThat(response.getRedirectedUrl()).isEqualTo(APP + "/problems?login=failed");
         assertThat(response.getCookie("accessToken")).isNull();
-        verify(authService, never()).authenticateGoogleUser(any());
+        verify(authService, never()).authenticateGoogleUser(any(), any());
     }
 
     @Test
     void callback_withoutStateCookie_isRejected() throws IOException {
-        controller.googleCallback("the-code", "state-123", null, null, response);
+        controller.googleCallback("the-code", "state-123", null, null, request, response);
 
         assertThat(response.getRedirectedUrl()).isEqualTo(APP + "/problems?login=failed");
         assertThat(response.getCookie("accessToken")).isNull();
-        verify(authService, never()).authenticateGoogleUser(any());
+        verify(authService, never()).authenticateGoogleUser(any(), any());
     }
 
     @Test
     void callback_whenGoogleReturnsError_isRejected() throws IOException {
-        controller.googleCallback(null, "state-123", "access_denied", "state-123", response);
+        controller.googleCallback(null, "state-123", "access_denied", "state-123", request, response);
 
         assertThat(response.getRedirectedUrl()).isEqualTo(APP + "/problems?login=failed");
-        verify(authService, never()).authenticateGoogleUser(any());
+        verify(authService, never()).authenticateGoogleUser(any(), any());
     }
 
     @Test
     void callback_whenCodeExchangeFails_returnsToAppWithFailure_andSetsNoAuthCookies() throws IOException {
-        when(authService.authenticateGoogleUser("bad-code")).thenThrow(new RuntimeException("google said no"));
+        when(authService.authenticateGoogleUser(eq("bad-code"), any(ClientMeta.class))).thenThrow(new RuntimeException("google said no"));
 
-        controller.googleCallback("bad-code", "state-123", null, "state-123", response);
+        controller.googleCallback("bad-code", "state-123", null, "state-123", request, response);
 
         assertThat(response.getRedirectedUrl()).isEqualTo(APP + "/problems?login=failed");
         assertThat(response.getCookie("accessToken")).isNull();

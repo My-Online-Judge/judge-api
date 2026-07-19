@@ -13,9 +13,11 @@ import vn.thanhtuanle.auth.dto.IntrospectResponse;
 import vn.thanhtuanle.auth.dto.LoginRequest;
 import vn.thanhtuanle.common.constant.Routes;
 import vn.thanhtuanle.common.payload.ApiResponse;
+import vn.thanhtuanle.common.util.ClientMeta;
 import vn.thanhtuanle.user.dto.UserResponse;
 
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -67,6 +69,7 @@ public class AuthController {
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error,
             @CookieValue(value = OAUTH_STATE_COOKIE, required = false) String expectedState,
+            HttpServletRequest httpRequest,
             HttpServletResponse response) throws IOException {
         addCookie(response, OAUTH_STATE_COOKIE, null, 0); // one-shot: always burn the state
 
@@ -78,7 +81,7 @@ public class AuthController {
         }
 
         try {
-            AuthResponse auth = authService.authenticateGoogleUser(code);
+            AuthResponse auth = authService.authenticateGoogleUser(code, ClientMeta.from(httpRequest));
             addCookie(response, ACCESS_TOKEN_COOKIE, auth.getAccessToken(), ACCESS_TOKEN_MAX_AGE);
             addCookie(response, REFRESH_TOKEN_COOKIE, auth.getRefreshToken(), REFRESH_TOKEN_MAX_AGE);
             response.sendRedirect(appBaseUrl + "/problems?login=ok");
@@ -97,8 +100,10 @@ public class AuthController {
     @Operation(summary = "Login with username & password",
             description = "Authenticates a password account (e.g. the seeded admin) and sets HttpOnly auth cookies")
     @PostMapping("/login")
-    public ApiResponse<Void> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
-        AuthResponse auth = authService.authenticateWithPassword(request.getUsername(), request.getPassword());
+    public ApiResponse<Void> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest,
+            HttpServletResponse response) {
+        AuthResponse auth = authService.authenticateWithPassword(
+                request.getUsername(), request.getPassword(), ClientMeta.from(httpRequest));
         addCookie(response, ACCESS_TOKEN_COOKIE, auth.getAccessToken(), ACCESS_TOKEN_MAX_AGE);
         addCookie(response, REFRESH_TOKEN_COOKIE, auth.getRefreshToken(), REFRESH_TOKEN_MAX_AGE);
         return ApiResponse.success();
@@ -124,10 +129,11 @@ public class AuthController {
     public ApiResponse<AuthResponse> refresh(
             @CookieValue(value = REFRESH_TOKEN_COOKIE, required = false) String refreshCookie,
             @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest httpRequest,
             HttpServletResponse response) {
         String refreshToken = refreshCookie != null ? refreshCookie
                 : (body != null ? body.get("refreshToken") : null);
-        var authResponse = authService.refreshAccessToken(refreshToken);
+        var authResponse = authService.refreshAccessToken(refreshToken, ClientMeta.from(httpRequest));
         addCookie(response, ACCESS_TOKEN_COOKIE, authResponse.getAccessToken(), ACCESS_TOKEN_MAX_AGE);
         return ApiResponse.success(authResponse);
     }
