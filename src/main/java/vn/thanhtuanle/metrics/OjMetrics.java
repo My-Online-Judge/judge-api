@@ -9,6 +9,7 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.submission.SubmissionRepository;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
@@ -30,9 +31,9 @@ public class OjMetrics {
     }
 
     /** Record one terminal verdict. Never throws — must not break the verdict transaction. */
-    public void recordVerdict(int status, Duration latency) {
+    public void recordVerdict(int status, LocalDateTime createdAt) {
         try {
-            latencyTimer.record(latency);
+            latencyTimer.record(Duration.between(createdAt, LocalDateTime.now()));
             registry.counter("oj.verdict", "status", statusName(status)).increment();
         } catch (Exception e) {
             log.warn("Failed to record verdict metrics: {}", e.getMessage());
