@@ -128,7 +128,7 @@ public class TestCaseBundleStore {
             if (zips.size() <= keep) {
                 return;
             }
-            zips.sort(Comparator.comparing(Item::lastModified).reversed());  // newest first
+            zips.sort(Comparator.comparing(Item::lastModified, Comparator.nullsLast(Comparator.naturalOrder())).reversed());  // newest first
             Set<String> retain = new LinkedHashSet<>();
             retain.add(bundleKey(slug, currentHash));   // always keep current
             for (Item i : zips) {
