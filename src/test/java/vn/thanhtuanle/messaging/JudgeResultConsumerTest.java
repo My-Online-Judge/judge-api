@@ -9,10 +9,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
+import vn.thanhtuanle.metrics.OjMetrics;
 import vn.thanhtuanle.submission.SubmissionRepository;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,10 +27,14 @@ class JudgeResultConsumerTest {
     @Mock SubmissionRepository submissionRepository;
     @Mock VerdictPubSub verdictPubSub;
     @Mock SubmissionMapper submissionMapper;
+    @Mock OjMetrics ojMetrics;
     @InjectMocks JudgeResultConsumer consumer;
 
     private Submission pending(UUID id) {
-        Submission s = Submission.builder().status(SubmissionResult.PENDING.getValue()).build();
+        Submission s = Submission.builder()
+                .status(SubmissionResult.PENDING.getValue())
+                .createdAt(LocalDateTime.now())
+                .build();
         s.setId(id);
         return s;
     }

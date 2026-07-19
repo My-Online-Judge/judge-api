@@ -2,6 +2,7 @@ package vn.thanhtuanle.submission;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -57,13 +58,16 @@ public class SubmissionService {
 
         Submission submission = createPendingSubmission(req, problem, language, currentUser);
         submissionRepository.save(submission);
-
-        SubmissionRequestedEvent event = judgeService.buildRequestedEvent(
-                submission.getId().toString(), submission.getSourceCode(), problem, language);
-        applicationEventPublisher.publishEvent(new SubmissionRequestedAppEvent(event));
-
-        log.info("Submission {} queued for judging", submission.getId());
-        return submissionMapper.toDto(submission);
+        MDC.put("submissionId", submission.getId().toString());
+        try {
+            SubmissionRequestedEvent event = judgeService.buildRequestedEvent(
+                    submission.getId().toString(), submission.getSourceCode(), problem, language);
+            applicationEventPublisher.publishEvent(new SubmissionRequestedAppEvent(event));
+            log.info("Submission {} queued for judging", submission.getId());
+            return submissionMapper.toDto(submission);
+        } finally {
+            MDC.remove("submissionId");
+        }
     }
 
     private Submission createPendingSubmission(SubmissionRequestDto req, Problem problem, Language language,

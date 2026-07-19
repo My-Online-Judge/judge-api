@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: backend-service
+  # Serialize any Instant/Date/Calendar JSON in Vietnam time (GMT+7). LocalDateTime fields are naive
+  # and unaffected by this — those are pinned via TimeZone.setDefault in BackendServiceApplication.main.
+  jackson:
+    time-zone: Asia/Ho_Chi_Minh
   profiles:
     active: @spring.profiles.active@
   kafka:
@@ -46,6 +50,8 @@ logging:
   level:
     root: INFO
     web: INFO
+  pattern:
+    correlation: "[%X{submissionId:-}] "
 
 judge:
   server:
@@ -53,3 +59,10 @@ judge:
   # Reconcile job: a submission left in PENDING/JUDGING longer than this is flipped to SYSTEM_ERROR.
   stuck-timeout-min: ${JUDGE_STUCK_TIMEOUT_MIN:5}
   reconcile-interval-ms: ${JUDGE_RECONCILE_INTERVAL_MS:60000}
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket: ${MINIO_BUCKET:test-cases}
+  bundle-retention: ${MINIO_BUNDLE_RETENTION:3}

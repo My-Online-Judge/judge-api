@@ -17,6 +17,8 @@ import java.util.List;
 @Slf4j
 public class JudgeService {
 
+    private final vn.thanhtuanle.testcase.TestCaseBundleStore bundleStore;
+
     private static final int MAX_CODE_LENGTH = 10240;
     private static final long BYTES_PER_MB = 1024L * 1024L;
 
@@ -81,7 +83,7 @@ public class JudgeService {
                 .languageConfig(languageConfig)
                 .maxCpuTime(problem.getTimeLimit())
                 .maxMemory(problem.getMemoryLimit() * BYTES_PER_MB)
-                .testCaseId(problem.getProblemSlug())
+                .testCaseId(problem.getProblemSlug() + "__" + bundleStore.currentVersion(problem.getProblemSlug()))
                 .output(true)
                 .build();
     }
