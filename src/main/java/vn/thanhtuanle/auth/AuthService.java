@@ -20,6 +20,7 @@ import vn.thanhtuanle.auth.dto.IntrospectResponse;
 import vn.thanhtuanle.common.enums.CommonStatus;
 import vn.thanhtuanle.common.enums.Role;
 import vn.thanhtuanle.common.enums.TokenType;
+import vn.thanhtuanle.common.util.ClientMeta;
 import vn.thanhtuanle.common.exception.AppException;
 import vn.thanhtuanle.common.exception.ErrorCode;
 import vn.thanhtuanle.common.util.JwtUtil;
@@ -93,7 +94,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse authenticateGoogleUser(String code) {
+    public AuthResponse authenticateGoogleUser(String code, ClientMeta meta) {
         // 1. Exchange code for tokens
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("code", code);
@@ -164,15 +165,22 @@ public class AuthService {
             userRepository.save(user);
         }
 
+        // Only active accounts may log in (disabled/soft-deleted users are blocked).
+        if (user.getStatus() == null || user.getStatus() != CommonStatus.ACTIVE.getValue()) {
+            throw new AppException(ErrorCode.USER_BLOCKED);
+        }
+
         // 4. Generate Tokens
         var jwtToken = jwtUtil.generateToken(user);
         var refreshToken = jwtUtil.generateRefreshToken(user);
 
         revokeAllUserTokens(user);
-        savedUserToken(user, jwtToken, TokenType.ACCESS);
-        savedUserToken(user, refreshToken, TokenType.REFRESH);
+        savedUserToken(user, jwtToken, TokenType.ACCESS, meta);
+        savedUserToken(user, refreshToken, TokenType.REFRESH, meta);
 
         user.setLastLogin(LocalDateTime.now());
+        user.setLastLoginIp(meta.ip());
+        user.setLastLoginDeviceHash(meta.deviceHash());
         userRepository.save(user);
 
         return AuthResponse.builder()
@@ -188,7 +196,7 @@ public class AuthService {
      * bookkeeping; the caller sets the returned tokens as HttpOnly cookies.
      */
     @Transactional
-    public AuthResponse authenticateWithPassword(String username, String password) {
+    public AuthResponse authenticateWithPassword(String username, String password, ClientMeta meta) {
         User user = userRepository.findByUsername(username)
                 .filter(u -> u.getPassword() != null && passwordEncoder.matches(password, u.getPassword()))
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
@@ -201,10 +209,12 @@ public class AuthService {
         String refreshToken = jwtUtil.generateRefreshToken(user);
 
         revokeAllUserTokens(user);
-        savedUserToken(user, accessToken, TokenType.ACCESS);
-        savedUserToken(user, refreshToken, TokenType.REFRESH);
+        savedUserToken(user, accessToken, TokenType.ACCESS, meta);
+        savedUserToken(user, refreshToken, TokenType.REFRESH, meta);
 
         user.setLastLogin(LocalDateTime.now());
+        user.setLastLoginIp(meta.ip());
+        user.setLastLoginDeviceHash(meta.deviceHash());
         userRepository.save(user);
 
         log.info("Password login for user: {}", username);
@@ -214,13 +224,16 @@ public class AuthService {
                 .build();
     }
 
-    private void savedUserToken(User user, String jwtToken, TokenType tokenType) {
+    private void savedUserToken(User user, String jwtToken, TokenType tokenType, ClientMeta meta) {
         var token = Token.builder()
                 .user(user)
                 .token(jwtToken)
                 .tokenType(tokenType)
                 .expired(false)
                 .revoked(false)
+                .ip(meta.ip())
+                .deviceHash(meta.deviceHash())
+                .userAgent(meta.userAgent())
                 .build();
         tokenRepository.save(token);
     }
@@ -230,7 +243,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse refreshAccessToken(String refreshToken) {
+    public AuthResponse refreshAccessToken(String refreshToken, ClientMeta meta) {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new AppException(ErrorCode.INVALID_CREDENTIALS);
         }
@@ -255,7 +268,7 @@ public class AuthService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         String newAccessToken = jwtUtil.generateToken(user);
-        savedUserToken(user, newAccessToken, TokenType.ACCESS);
+        savedUserToken(user, newAccessToken, TokenType.ACCESS, meta);
         log.info("Issued new access token via refresh for user: {}", username);
 
         return AuthResponse.builder()
