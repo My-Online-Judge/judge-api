@@ -11,8 +11,9 @@ import vn.thanhtuanle.problem.ProblemRepository;
 
 /**
  * On boot, ensures every existing problem has a test-case bundle in MinIO. Idempotent: a problem
- * that already has a CURRENT pointer is skipped. Excluded from the {@code test} profile so the
- * H2 context test never touches a real MinIO.
+ * that already has a CURRENT pointer is not republished, but is still pruned so pre-existing
+ * duplicate versions get cleaned up on boot. Excluded from the {@code test} profile so the H2
+ * context test never touches a real MinIO.
  */
 @Component
 @Profile("!test")
