@@ -20,6 +20,9 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
     @Query("SELECT s FROM Submission s WHERE s.status IN :statuses AND s.createdAt < :threshold")
     List<Submission> findStuck(@Param("statuses") Collection<Integer> statuses,
                                @Param("threshold") LocalDateTime threshold);
+
+    /** Count submissions currently in one of the given statuses — used by the oj.queue.depth gauge. */
+    long countByStatusIn(Collection<Integer> statuses);
     @Query("SELECT s FROM Submission s WHERE s.problem.problemSlug = :slug ORDER BY s.createdAt DESC")
     Page<Submission> findByProblemSlugOrderByCreatedAtDesc(@Param("slug") String slug, Pageable pageable);
 

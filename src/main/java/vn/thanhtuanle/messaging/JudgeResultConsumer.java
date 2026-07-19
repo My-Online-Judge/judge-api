@@ -54,6 +54,8 @@ public class JudgeResultConsumer {
             submission.setErrorMessage(event.getErrorMessage());
             submissionRepository.save(submission);
             verdictPubSub.publish(event.getSubmissionId(), submissionMapper.toDto(submission));
+            ojMetrics.recordVerdict(event.getStatus(),
+                    java.time.Duration.between(submission.getCreatedAt(), java.time.LocalDateTime.now()));
             log.info("Applied verdict {} to submission {}", event.getStatus(), id);
         } finally {
             MDC.remove("submissionId");
