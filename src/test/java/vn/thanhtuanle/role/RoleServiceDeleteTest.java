@@ -62,6 +62,17 @@ class RoleServiceDeleteTest {
     }
 
     @Test
+    void systemRole_sysRoot_isProtected_neverDeletes() {
+        Role sysRoot = role("SYS_ROOT");
+        when(roleRepository.findById(sysRoot.getId())).thenReturn(Optional.of(sysRoot));
+
+        assertThatThrownBy(() -> roleService.delete(sysRoot.getId()))
+                .isInstanceOfSatisfying(AppException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ROLE_PROTECTED));
+        verify(roleRepository, never()).delete(any());
+    }
+
+    @Test
     void unknownRole_throwsRoleNotExisted() {
         UUID id = UUID.randomUUID();
         when(roleRepository.findById(id)).thenReturn(Optional.empty());
