@@ -63,3 +63,4 @@ minio:
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
   secret-key: ${MINIO_SECRET_KEY:minioadmin}
   bucket: ${MINIO_BUCKET:test-cases}
+  bundle-retention: ${MINIO_BUNDLE_RETENTION:3}

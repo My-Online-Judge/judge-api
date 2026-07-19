@@ -2,11 +2,15 @@ package vn.thanhtuanle.testcase;
 
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
+import io.minio.ListObjectsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
+import io.minio.Result;
 import io.minio.StatObjectArgs;
 import io.minio.errors.ErrorResponseException;
+import io.minio.messages.Item;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -21,9 +25,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -66,6 +73,7 @@ public class TestCaseBundleStore {
                 putBytes(key, zip(files), "application/zip");
             }
             putBytes(currentKey(slug), hash.getBytes(StandardCharsets.UTF_8), "text/plain");
+            pruneOldBundles(slug, hash);
             log.info("Published test-case bundle for {} -> {}", slug, hash);
             return hash;
         } catch (TestCaseBundleException e) {
@@ -98,6 +106,44 @@ public class TestCaseBundleStore {
             }
         } catch (Exception e) {
             throw new TestCaseBundleException("Failed to ensure bucket " + props.getBucket(), e);
+        }
+    }
+
+    /**
+     * Keep the current bundle plus the (retention-1) most-recent other versions for this slug;
+     * remove the rest. The current hash is retained unconditionally (a revert can make it old by
+     * time). Never throws — GC must not fail a publish.
+     */
+    void pruneOldBundles(String slug, String currentHash) {
+        try {
+            int keep = Math.max(1, props.getBundleRetention());
+            List<Item> zips = new ArrayList<>();
+            for (Result<Item> r : minio.listObjects(ListObjectsArgs.builder()
+                    .bucket(props.getBucket()).prefix(slug + "/").build())) {
+                Item item = r.get();
+                if (item.objectName().endsWith(".zip")) {
+                    zips.add(item);
+                }
+            }
+            if (zips.size() <= keep) {
+                return;
+            }
+            zips.sort(Comparator.comparing(Item::lastModified).reversed());  // newest first
+            Set<String> retain = new LinkedHashSet<>();
+            retain.add(bundleKey(slug, currentHash));   // always keep current
+            for (Item i : zips) {
+                if (retain.size() >= keep) break;
+                retain.add(i.objectName());              // fill with most-recent (current re-add is a no-op)
+            }
+            for (Item i : zips) {
+                if (!retain.contains(i.objectName())) {
+                    minio.removeObject(RemoveObjectArgs.builder()
+                            .bucket(props.getBucket()).object(i.objectName()).build());
+                    log.info("GC: removed old test-case bundle {}", i.objectName());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("GC of old bundles for {} failed (non-fatal): {}", slug, e.getMessage());
         }
     }
 

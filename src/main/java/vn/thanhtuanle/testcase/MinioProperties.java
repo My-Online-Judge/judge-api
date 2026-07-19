@@ -14,4 +14,6 @@ public class MinioProperties {
     private String accessKey = "minioadmin";
     private String secretKey = "minioadmin";
     private String bucket = "test-cases";
+    /** How many bundle versions to keep per problem (current + previous). */
+    private int bundleRetention = 3;
 }

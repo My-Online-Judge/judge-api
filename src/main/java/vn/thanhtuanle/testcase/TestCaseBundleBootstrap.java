@@ -28,12 +28,15 @@ public class TestCaseBundleBootstrap implements ApplicationRunner {
         store.ensureBucket();
         for (Problem problem : problemRepository.findAll()) {
             String slug = problem.getProblemSlug();
-            if (slug == null || store.hasBundle(slug)) {
+            if (slug == null) {
                 continue;
             }
             try {
-                store.publish(slug);
-                log.info("Seeded MinIO test-case bundle for {}", slug);
+                if (!store.hasBundle(slug)) {
+                    store.publish(slug);
+                    log.info("Seeded MinIO test-case bundle for {}", slug);
+                }
+                store.pruneOldBundles(slug, store.currentVersion(slug));
             } catch (Exception e) {
                 log.warn("Could not seed test-case bundle for {}: {}", slug, e.getMessage());
             }
