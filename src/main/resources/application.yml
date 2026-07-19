@@ -50,6 +50,8 @@ logging:
   level:
     root: INFO
     web: INFO
+  pattern:
+    correlation: "[%X{submissionId:-}] "
 
 judge:
   server:
