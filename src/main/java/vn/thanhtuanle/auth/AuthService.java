@@ -267,6 +267,12 @@ public class AuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        // Same account-status gate as authenticateWithPassword: a disabled/blocked account
+        // must not be able to keep renewing its access token via refresh.
+        if (user.getStatus() == null || user.getStatus() != CommonStatus.ACTIVE.getValue()) {
+            throw new AppException(ErrorCode.USER_BLOCKED);
+        }
+
         String newAccessToken = jwtUtil.generateToken(user);
         // One ACCESS row per live session: at a 15-minute TTL, appending a row per
         // refresh would add ~96 rows/user/day that nothing cleans up until the next login.
