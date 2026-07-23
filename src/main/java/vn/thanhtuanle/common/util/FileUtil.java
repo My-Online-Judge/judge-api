@@ -30,9 +30,14 @@ public class FileUtil {
     }
 
     public static Map<String, byte[]> extractZip(MultipartFile zipFile) throws IOException {
+        try (InputStream is = zipFile.getInputStream()) {
+            return extractZip(is);
+        }
+    }
+
+    public static Map<String, byte[]> extractZip(InputStream in) throws IOException {
         Map<String, byte[]> extractedFiles = new HashMap<>();
-        try (InputStream fis = zipFile.getInputStream();
-                ZipInputStream zis = new ZipInputStream(fis)) {
+        try (ZipInputStream zis = new ZipInputStream(in)) {
             ZipEntry zipEntry = zis.getNextEntry();
             while (zipEntry != null) {
                 if (!zipEntry.isDirectory()) {
