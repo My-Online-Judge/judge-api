@@ -8,9 +8,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
+import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.dto.TestCaseResultDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
+import vn.thanhtuanle.user.UserService;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,14 +29,18 @@ class SubmissionServiceDetailsTest {
     @Mock SubmissionRepository submissionRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock SubmissionDetailAssembler detailAssembler;
+    @Mock UserService userService;
     @InjectMocks SubmissionService service;
 
     @Test
     void getById_populatesDetailsFromAssembler() {
         UUID id = UUID.randomUUID();
-        Submission s = Submission.builder().problem(new Problem()).build();
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
+        Submission s = Submission.builder().problem(new Problem()).user(owner).build();
         s.setId(id);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+        when(userService.getCurrentUser()).thenReturn(owner);
 
         List<TestCaseResultDto> rows = List.of(
                 TestCaseResultDto.builder().name("1").result(0).build());

@@ -8,9 +8,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import vn.thanhtuanle.common.constant.Permissions;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.common.payload.PageResponse;
@@ -104,6 +106,7 @@ public class SubmissionService {
         log.info("Service to get submission by id: {}", id);
         Submission submission = submissionRepository.findById(UUID.fromString(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + id));
+        assertCanRead(submission, id);
         return submissionMapper.toDto(submission, detailAssembler.assemble(submission));
     }
 
@@ -119,6 +122,7 @@ public class SubmissionService {
             emitter.complete();
             return emitter;
         }
+        assertCanRead(submission, id);
         if (SubmissionResult.isTerminal(submission.getStatus())) {
             log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
                     id, submission.getStatus());
@@ -130,6 +134,11 @@ public class SubmissionService {
     @Transactional(readOnly = true)
     public PageResponse<SubmissionResponseDto> getSubmissionsByUser(String userId, int page, int size) {
         log.info("Service to get submissions by user_id: {}", userId);
+
+        UUID requested = UUID.fromString(userId);
+        if (!requested.equals(userService.getCurrentUser().getId()) && !hasReadAnyAuthority()) {
+            throw new ResourceNotFoundException("Submissions not found for user: " + userId);
+        }
 
         Pageable pageable = PageRequest.of(page, size);
 
@@ -145,6 +154,11 @@ public class SubmissionService {
             int page, int size) {
         log.info("Service to get submissions by user_id: {} and problem_slug: {}", userId, problemSlug);
 
+        UUID requested = UUID.fromString(userId);
+        if (!requested.equals(userService.getCurrentUser().getId()) && !hasReadAnyAuthority()) {
+            throw new ResourceNotFoundException("Submissions not found for user: " + userId);
+        }
+
         Pageable pageable = PageRequest.of(page, size);
 
         Page<Submission> submissionPage = submissionRepository
@@ -153,5 +167,26 @@ public class SubmissionService {
         log.info("Found {} submissions for user_id: {} and problem_slug: {}", submissionPage.getTotalElements(), userId,
                 problemSlug);
         return PageResponse.of(submissionPage.map(submissionMapper::toDto));
+    }
+
+    /**
+     * Owner-or-admin gate. Throws {@link ResourceNotFoundException} — deliberately a 404 rather
+     * than a 403, so the response does not confirm that an id exists.
+     */
+    private void assertCanRead(Submission submission, String id) {
+        User current = userService.getCurrentUser();
+        boolean isOwner = submission.getUser() != null
+                && submission.getUser().getId().equals(current.getId());
+        if (isOwner || hasReadAnyAuthority()) {
+            return;
+        }
+        log.warn("User {} denied access to submission {}", current.getId(), id);
+        throw new ResourceNotFoundException("Submission not found with id: " + id);
+    }
+
+    private boolean hasReadAnyAuthority() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> Permissions.SUBMISSION_READ_ANY.equals(a.getAuthority()));
     }
 }

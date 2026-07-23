@@ -11,6 +11,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
+import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
 import vn.thanhtuanle.problem.ProblemRepository;
@@ -44,14 +45,18 @@ class SubmissionServiceStreamTest {
     @Test
     void streamVerdict_registersEmitterBeforeReadingDb_andReplaysTerminalVerdict() {
         UUID id = UUID.randomUUID();
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
         Submission s = new Submission();
         s.setId(id);
+        s.setUser(owner);
         s.setStatus(SubmissionResult.ACCEPTED.getValue());
         SubmissionResponseDto dto = SubmissionResponseDto.builder()
                 .status(SubmissionResult.ACCEPTED.getValue()).build();
         SseEmitter emitter = new SseEmitter();
         when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+        when(userService.getCurrentUser()).thenReturn(owner);
         when(submissionMapper.toDto(eq(s), any())).thenReturn(dto);
 
         SseEmitter result = submissionService.streamVerdict(id.toString());
@@ -67,11 +72,15 @@ class SubmissionServiceStreamTest {
     @Test
     void streamVerdict_whenPending_doesNotReplay() {
         UUID id = UUID.randomUUID();
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
         Submission s = new Submission();
         s.setId(id);
+        s.setUser(owner);
         s.setStatus(SubmissionResult.PENDING.getValue());
         when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+        when(userService.getCurrentUser()).thenReturn(owner);
 
         submissionService.streamVerdict(id.toString());
 
@@ -82,11 +91,15 @@ class SubmissionServiceStreamTest {
     @Test
     void streamVerdict_whenJudging_doesNotReplay() {
         UUID id = UUID.randomUUID();
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
         Submission s = new Submission();
         s.setId(id);
+        s.setUser(owner);
         s.setStatus(SubmissionResult.JUDGING.getValue());
         when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+        when(userService.getCurrentUser()).thenReturn(owner);
 
         submissionService.streamVerdict(id.toString());
 
