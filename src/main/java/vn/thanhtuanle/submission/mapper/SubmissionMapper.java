@@ -15,7 +15,11 @@ public interface SubmissionMapper {
     @Mapping(target = "details", source = "details")
     SubmissionResponseDto toDto(Submission submission, List<TestCaseResultDto> details);
 
-    /** List view: details deliberately omitted, see SubmissionService. */
+    /**
+     * List view: details and sourceCode deliberately omitted. List views never carry source
+     * code — reading source requires the owner-gated single-submission endpoint.
+     */
     @Mapping(target = "details", ignore = true)
+    @Mapping(target = "sourceCode", ignore = true)
     SubmissionResponseDto toDto(Submission submission);
 }

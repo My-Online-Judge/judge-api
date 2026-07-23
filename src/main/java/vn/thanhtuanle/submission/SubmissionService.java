@@ -112,17 +112,17 @@ public class SubmissionService {
 
     @Transactional(readOnly = true)
     public SseEmitter streamVerdict(String id) {
-        // Register the emitter FIRST: if the verdict fires between here and the DB
-        // read, the consumer still finds this emitter. Then, if the submission is
-        // already terminal, replay the verdict now so a late subscriber isn't lost.
-        SseEmitter emitter = sseRegistry.subscribe(id);
-        Submission submission = submissionRepository.findById(UUID.fromString(id)).orElse(null);
-        if (submission == null) {
-            log.info("SSE subscribe for unknown submission {}, completing", id);
-            emitter.complete();
-            return emitter;
-        }
+        // Load + authorize BEFORE subscribing: an unknown id must 404 identically to a denied
+        // id (no existence oracle), and no emitter may ever be registered for a request that
+        // fails either check (registering first would let a denied/unknown request evict a
+        // legitimate owner's live emitter — an eviction DoS).
+        Submission submission = submissionRepository.findById(UUID.fromString(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + id));
         assertCanRead(submission, id);
+
+        // Now that the caller is authorized, register the emitter, then replay the verdict
+        // immediately if the submission is already terminal so a late subscriber isn't lost.
+        SseEmitter emitter = sseRegistry.subscribe(id);
         if (SubmissionResult.isTerminal(submission.getStatus())) {
             log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
                     id, submission.getStatus());
