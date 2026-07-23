@@ -111,6 +111,39 @@ class SubmissionServiceStreamTest {
     }
 
     @Test
+    void streamVerdict_verdictArrivesBetweenLoadAndSubscribe_replaysFromFreshRead() {
+        // Pins the missed-verdict race: the terminal replay decision must be made from a
+        // read taken AFTER subscribe, not the pre-subscribe snapshot used to authorize.
+        UUID id = UUID.randomUUID();
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
+
+        Submission pendingAtLoad = new Submission();
+        pendingAtLoad.setId(id);
+        pendingAtLoad.setUser(owner);
+        pendingAtLoad.setStatus(SubmissionResult.PENDING.getValue());
+
+        Submission terminalAtSubscribe = new Submission();
+        terminalAtSubscribe.setId(id);
+        terminalAtSubscribe.setUser(owner);
+        terminalAtSubscribe.setStatus(SubmissionResult.ACCEPTED.getValue());
+
+        SubmissionResponseDto dto = SubmissionResponseDto.builder()
+                .status(SubmissionResult.ACCEPTED.getValue()).build();
+        SseEmitter emitter = new SseEmitter();
+
+        // Consecutive stubbing: the verdict "lands" between the authorizing read and subscribe.
+        when(submissionRepository.findById(id)).thenReturn(Optional.of(pendingAtLoad), Optional.of(terminalAtSubscribe));
+        when(userService.getCurrentUser()).thenReturn(owner);
+        when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
+        when(submissionMapper.toDto(eq(terminalAtSubscribe), any())).thenReturn(dto);
+
+        submissionService.streamVerdict(id.toString());
+
+        verify(sseRegistry).complete(id.toString(), dto);
+    }
+
+    @Test
     void streamVerdict_whenNotFound_throwsResourceNotFound() {
         // Behavior change (approved): unknown id used to complete an already-registered
         // emitter with no verdict (200-empty). It now 404s before ever subscribing, so an

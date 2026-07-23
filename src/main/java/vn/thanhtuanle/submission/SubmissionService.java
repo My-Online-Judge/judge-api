@@ -120,14 +120,20 @@ public class SubmissionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + id));
         assertCanRead(submission, id);
 
-        // Now that the caller is authorized, register the emitter, then replay the verdict
-        // immediately if the submission is already terminal so a late subscriber isn't lost.
+        // Now that the caller is authorized, register the emitter. The verdict may have
+        // landed in the window between the read above and subscribe(): if the Kafka consumer's
+        // complete() ran before the emitter existed, the replay decision must not be made from
+        // the now-stale pre-subscribe snapshot, or the owner's stream hangs until timeout. So
+        // re-read fresh, post-subscribe, and decide the replay from that: the first read only
+        // authorizes, the second read closes the race.
         SseEmitter emitter = sseRegistry.subscribe(id);
-        if (SubmissionResult.isTerminal(submission.getStatus())) {
-            log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
-                    id, submission.getStatus());
-            sseRegistry.complete(id, submissionMapper.toDto(submission, detailAssembler.assemble(submission)));
-        }
+        submissionRepository.findById(UUID.fromString(id)).ifPresent(fresh -> {
+            if (SubmissionResult.isTerminal(fresh.getStatus())) {
+                log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
+                        id, fresh.getStatus());
+                sseRegistry.complete(id, submissionMapper.toDto(fresh, detailAssembler.assemble(fresh)));
+            }
+        });
         return emitter;
     }
 
