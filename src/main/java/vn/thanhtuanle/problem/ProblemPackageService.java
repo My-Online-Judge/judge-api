@@ -106,12 +106,16 @@ public class ProblemPackageService {
         Problem problem = problemRepository.findByProblemSlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with slug: " + slug));
 
+        if (problem.getMemoryLimit() == null) {
+            throw new IllegalStateException("Cannot export problem " + slug + ": memoryLimit is not set");
+        }
+
         CreateProblemDto dto = CreateProblemDto.builder()
                 .title(problem.getTitle())
                 .subject(problem.getSubject())
                 .description(problem.getDescription())
                 .timeLimit(problem.getTimeLimit())
-                .memoryLimit(problem.getMemoryLimit() != null ? problem.getMemoryLimit().intValue() : 0)
+                .memoryLimit(problem.getMemoryLimit().intValue())
                 .hardnessLevel(problem.getHardnessLevel())
                 .problemSlug(problem.getProblemSlug())
                 .inputDescription(problem.getInputDescription())

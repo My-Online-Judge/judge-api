@@ -10,6 +10,10 @@ spring:
     time-zone: Asia/Ho_Chi_Minh
   profiles:
     active: @spring.profiles.active@
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
   kafka:
     bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
     producer:

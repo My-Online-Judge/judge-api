@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import vn.thanhtuanle.common.payload.ApiResponse;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -91,5 +92,12 @@ public class GlobalExceptionHandler {
             AccessDeniedException ex) {
         log.error("Access Denied: ", ex);
         return ApiResponse.error(HttpStatus.FORBIDDEN.value(), "Access Denied: " + ex.getMessage());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public ApiResponse<Object> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
+        log.error("MaxUploadSizeExceededException: ", ex);
+        return ApiResponse.error(HttpStatus.PAYLOAD_TOO_LARGE.value(), "Uploaded file is too large");
     }
 }

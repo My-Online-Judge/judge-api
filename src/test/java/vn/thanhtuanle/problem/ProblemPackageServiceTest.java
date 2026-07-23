@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 
+import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.problem.dto.CreateProblemDto;
 import vn.thanhtuanle.problem.dto.ProblemResponseDto;
 
@@ -15,6 +16,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -207,5 +209,23 @@ class ProblemPackageServiceTest {
         assertThatThrownBy(() -> service.importProblem(empty, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("empty");
+    }
+
+    @Test
+    void exportProblem_nullMemoryLimit_throws() {
+        ProblemRepository problemRepository = mock(ProblemRepository.class);
+        ProblemPackageService exportService =
+                new ProblemPackageService(objectMapper, validator, null, problemRepository);
+        Problem problem = Problem.builder()
+                .title("A plus B").subject("math").description("<p>add</p>")
+                .timeLimit(1000).memoryLimit(null).hardnessLevel(1)
+                .problemSlug("a-plus-b").inputDescription("i").outputDescription("o")
+                .sampleInput("1 2").sampleOutput("3")
+                .build();
+        when(problemRepository.findByProblemSlug("a-plus-b")).thenReturn(Optional.of(problem));
+
+        assertThatThrownBy(() -> exportService.exportProblem("a-plus-b"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("memoryLimit");
     }
 }
