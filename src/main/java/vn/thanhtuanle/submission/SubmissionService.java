@@ -1,5 +1,6 @@
 package vn.thanhtuanle.submission;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -47,6 +48,8 @@ public class SubmissionService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final SubmissionSseRegistry sseRegistry;
     private final SubmissionDetailAssembler detailAssembler;
+    // Shared transactional EntityManager proxy — used only for refresh() in streamVerdict.
+    private final EntityManager entityManager;
 
     @Transactional
     public SubmissionResponseDto submit(SubmissionRequestDto req) {
@@ -115,25 +118,33 @@ public class SubmissionService {
         // Load + authorize BEFORE subscribing: an unknown id must 404 identically to a denied
         // id (no existence oracle), and no emitter may ever be registered for a request that
         // fails either check (registering first would let a denied/unknown request evict a
-        // legitimate owner's live emitter — an eviction DoS).
+        // legitimate owner's live emitter — an eviction DoS). This first read ONLY authorizes;
+        // it is never the basis for the replay decision.
         Submission submission = submissionRepository.findById(UUID.fromString(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + id));
         assertCanRead(submission, id);
 
-        // Now that the caller is authorized, register the emitter. The verdict may have
-        // landed in the window between the read above and subscribe(): if the Kafka consumer's
-        // complete() ran before the emitter existed, the replay decision must not be made from
-        // the now-stale pre-subscribe snapshot, or the owner's stream hangs until timeout. So
-        // re-read fresh, post-subscribe, and decide the replay from that: the first read only
-        // authorizes, the second read closes the race.
+        // Now that the caller is authorized, register the emitter. The verdict may have landed
+        // in the window between the read above and subscribe(): if the consumer's publish ran
+        // before the emitter existed, the replay decision must come from a GENUINELY fresh
+        // read. A second findById would not be one — within this persistence context it returns
+        // the already-managed (stale) instance without touching the database. The scalar status
+        // query below always hits the database (see the warning on findStatusById), so it sees
+        // the committed verdict; refresh() then forces a DB re-read into the managed instance
+        // so the replay payload matches. Together with the consumer publishing only AFTER its
+        // commit (JudgeResultConsumer.publishAfterCommit), this closes the race completely: a
+        // subscriber either registers before the post-commit publish (receives it live) or
+        // re-reads after the commit (sees terminal here and replays).
         SseEmitter emitter = sseRegistry.subscribe(id);
-        submissionRepository.findById(UUID.fromString(id)).ifPresent(fresh -> {
-            if (SubmissionResult.isTerminal(fresh.getStatus())) {
-                log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
-                        id, fresh.getStatus());
-                sseRegistry.complete(id, submissionMapper.toDto(fresh, detailAssembler.assemble(fresh)));
-            }
-        });
+        Integer freshStatus = submissionRepository.findStatusById(UUID.fromString(id));
+        if (freshStatus != null && SubmissionResult.isTerminal(freshStatus)) {
+            entityManager.refresh(submission);
+            log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
+                    id, submission.getStatus());
+            sseRegistry.complete(id, submissionMapper.toDto(submission, detailAssembler.assemble(submission)));
+        }
+        // Null (row gone) or non-terminal: no replay — the live post-commit publish or the
+        // registry timeout takes it from here.
         return emitter;
     }
 

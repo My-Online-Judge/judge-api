@@ -6,12 +6,15 @@ import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
 import vn.thanhtuanle.metrics.OjMetrics;
 import vn.thanhtuanle.submission.SubmissionDetailAssembler;
 import vn.thanhtuanle.submission.SubmissionRepository;
+import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
 import java.util.UUID;
@@ -56,12 +59,35 @@ public class JudgeResultConsumer {
             submission.setErrorMessage(event.getErrorMessage());
             submission.setDetails(event.getDetails());
             submissionRepository.save(submission);
-            verdictPubSub.publish(event.getSubmissionId(),
+            publishAfterCommit(event.getSubmissionId(),
                     submissionMapper.toDto(submission, detailAssembler.assemble(submission)));
             ojMetrics.recordVerdict(event.getStatus(), submission.getCreatedAt());
             log.info("Applied verdict {} to submission {}", event.getStatus(), id);
         } finally {
             MDC.remove("submissionId");
+        }
+    }
+
+    /**
+     * Publish the verdict to subscribers only AFTER the surrounding transaction commits.
+     * Publishing inside the transaction opens a window where a subscriber's fresh re-read
+     * (SubmissionService.streamVerdict) still sees the uncommitted-as-PENDING row while the
+     * live publish has already passed its emitter by — the verdict would be lost until the
+     * registry timeout. Post-commit, either the subscriber registered before the publish
+     * (receives it live) or its re-read observes the committed terminal row (replays).
+     * With no active transaction (e.g. unit tests calling onJudged directly), publish
+     * immediately — there is no commit to wait for.
+     */
+    private void publishAfterCommit(String submissionId, SubmissionResponseDto dto) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    verdictPubSub.publish(submissionId, dto);
+                }
+            });
+        } else {
+            verdictPubSub.publish(submissionId, dto);
         }
     }
 }
