@@ -11,6 +11,7 @@ import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.dto.JudgeResultDto;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
 import vn.thanhtuanle.metrics.OjMetrics;
+import vn.thanhtuanle.submission.SubmissionDetailAssembler;
 import vn.thanhtuanle.submission.SubmissionRepository;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
@@ -31,6 +32,7 @@ class JudgeResultConsumerDetailsTest {
     @Mock VerdictPubSub verdictPubSub;
     @Mock SubmissionMapper submissionMapper;
     @Mock OjMetrics ojMetrics;
+    @Mock SubmissionDetailAssembler detailAssembler;
     @InjectMocks JudgeResultConsumer consumer;
 
     private Submission pending(UUID id) {
@@ -47,7 +49,7 @@ class JudgeResultConsumerDetailsTest {
         UUID id = UUID.randomUUID();
         Submission s = pending(id);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
-        when(submissionMapper.toDto(any(Submission.class)))
+        when(submissionMapper.toDto(any(Submission.class), any()))
                 .thenReturn(SubmissionResponseDto.builder().build());
 
         JudgeResultDto case1 = JudgeResultDto.builder()
@@ -74,7 +76,7 @@ class JudgeResultConsumerDetailsTest {
         UUID id = UUID.randomUUID();
         Submission s = pending(id);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
-        when(submissionMapper.toDto(any(Submission.class)))
+        when(submissionMapper.toDto(any(Submission.class), any()))
                 .thenReturn(SubmissionResponseDto.builder().build());
 
         SubmissionJudgedEvent e = SubmissionJudgedEvent.builder()

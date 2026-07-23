@@ -44,6 +44,7 @@ public class SubmissionService {
     private final UserService userService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final SubmissionSseRegistry sseRegistry;
+    private final SubmissionDetailAssembler detailAssembler;
 
     @Transactional
     public SubmissionResponseDto submit(SubmissionRequestDto req) {
@@ -103,7 +104,7 @@ public class SubmissionService {
         log.info("Service to get submission by id: {}", id);
         Submission submission = submissionRepository.findById(UUID.fromString(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + id));
-        return submissionMapper.toDto(submission);
+        return submissionMapper.toDto(submission, detailAssembler.assemble(submission));
     }
 
     @Transactional(readOnly = true)
@@ -121,7 +122,7 @@ public class SubmissionService {
         if (SubmissionResult.isTerminal(submission.getStatus())) {
             log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
                     id, submission.getStatus());
-            sseRegistry.complete(id, submissionMapper.toDto(submission));
+            sseRegistry.complete(id, submissionMapper.toDto(submission, detailAssembler.assemble(submission)));
         }
         return emitter;
     }

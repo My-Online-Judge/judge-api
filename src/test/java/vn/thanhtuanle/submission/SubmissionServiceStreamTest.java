@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +37,7 @@ class SubmissionServiceStreamTest {
     @Mock UserService userService;
     @Mock ApplicationEventPublisher applicationEventPublisher;
     @Mock SubmissionSseRegistry sseRegistry;
+    @Mock SubmissionDetailAssembler detailAssembler;
 
     @InjectMocks SubmissionService submissionService;
 
@@ -50,7 +52,7 @@ class SubmissionServiceStreamTest {
         SseEmitter emitter = new SseEmitter();
         when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
-        when(submissionMapper.toDto(s)).thenReturn(dto);
+        when(submissionMapper.toDto(eq(s), any())).thenReturn(dto);
 
         SseEmitter result = submissionService.streamVerdict(id.toString());
 

@@ -10,6 +10,7 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
 import vn.thanhtuanle.metrics.OjMetrics;
+import vn.thanhtuanle.submission.SubmissionDetailAssembler;
 import vn.thanhtuanle.submission.SubmissionRepository;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
@@ -24,6 +25,7 @@ public class JudgeResultConsumer {
     private final VerdictPubSub verdictPubSub;
     private final SubmissionMapper submissionMapper;
     private final OjMetrics ojMetrics;
+    private final SubmissionDetailAssembler detailAssembler;
 
     @KafkaListener(topics = KafkaTopics.SUBMISSION_JUDGED, groupId = "judge-api-results")
     @Transactional
@@ -54,7 +56,8 @@ public class JudgeResultConsumer {
             submission.setErrorMessage(event.getErrorMessage());
             submission.setDetails(event.getDetails());
             submissionRepository.save(submission);
-            verdictPubSub.publish(event.getSubmissionId(), submissionMapper.toDto(submission));
+            verdictPubSub.publish(event.getSubmissionId(),
+                    submissionMapper.toDto(submission, detailAssembler.assemble(submission)));
             ojMetrics.recordVerdict(event.getStatus(), submission.getCreatedAt());
             log.info("Applied verdict {} to submission {}", event.getStatus(), id);
         } finally {

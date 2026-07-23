@@ -10,6 +10,7 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
 import vn.thanhtuanle.metrics.OjMetrics;
+import vn.thanhtuanle.submission.SubmissionDetailAssembler;
 import vn.thanhtuanle.submission.SubmissionRepository;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
@@ -28,6 +29,7 @@ class JudgeResultConsumerTest {
     @Mock VerdictPubSub verdictPubSub;
     @Mock SubmissionMapper submissionMapper;
     @Mock OjMetrics ojMetrics;
+    @Mock SubmissionDetailAssembler detailAssembler;
     @InjectMocks JudgeResultConsumer consumer;
 
     private Submission pending(UUID id) {
@@ -46,7 +48,7 @@ class JudgeResultConsumerTest {
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         SubmissionResponseDto dto = SubmissionResponseDto.builder()
                 .status(SubmissionResult.ACCEPTED.getValue()).build();
-        when(submissionMapper.toDto(s)).thenReturn(dto);
+        when(submissionMapper.toDto(eq(s), any())).thenReturn(dto);
 
         SubmissionJudgedEvent e = SubmissionJudgedEvent.builder()
                 .submissionId(id.toString()).status(SubmissionResult.ACCEPTED.getValue())
