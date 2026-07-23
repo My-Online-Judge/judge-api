@@ -7,6 +7,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import vn.thanhtuanle.common.payload.PageResponse;
 import vn.thanhtuanle.common.util.ClientMeta;
@@ -26,7 +27,15 @@ public class LoginAttemptService {
 
     private final LoginAttemptRepository repository;
 
-    /** Never throws — the audit trail must not break login itself. */
+    /**
+     * Never throws — the audit trail must not break login itself.
+     *
+     * <p>REQUIRES_NEW is load-bearing: failed logins are recorded from inside AuthService's
+     * @Transactional method right before the AppException is rethrown, which marks that
+     * transaction rollback-only. Without a fresh transaction the failure row would be
+     * silently rolled back with it (observed live before this annotation existed).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(String username, ClientMeta meta, boolean success, String errorCode) {
         try {
             repository.save(LoginAttempt.builder()
