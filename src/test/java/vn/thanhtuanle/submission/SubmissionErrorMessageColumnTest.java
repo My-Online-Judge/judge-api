@@ -45,7 +45,7 @@ class SubmissionErrorMessageColumnTest {
                 .migrate();
 
         // A real gcc dump (even with -fmax-errors=3) easily exceeds the old varchar(255) cap.
-        String longError = "error: something went wrong on this line; ".repeat(10); // 430 chars
+        String longError = "error: something went wrong on this line; ".repeat(10); // 420 chars
         assertThat(longError.length()).isGreaterThan(255);
 
         UUID problemId = UUID.randomUUID();
