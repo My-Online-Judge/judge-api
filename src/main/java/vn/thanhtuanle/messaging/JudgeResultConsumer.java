@@ -52,6 +52,7 @@ public class JudgeResultConsumer {
             submission.setTime(event.getRealTime());
             submission.setMemory(event.getMemory());
             submission.setErrorMessage(event.getErrorMessage());
+            submission.setDetails(event.getDetails());
             submissionRepository.save(submission);
             verdictPubSub.publish(event.getSubmissionId(), submissionMapper.toDto(submission));
             ojMetrics.recordVerdict(event.getStatus(), submission.getCreatedAt());
