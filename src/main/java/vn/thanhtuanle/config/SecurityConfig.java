@@ -96,18 +96,6 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    // Runs at order -200 — before springSecurityFilterChain (order -100) — so a ban covers
-    // every endpoint, including permitAll ones. Having this registration bean also stops
-    // Boot from auto-registering the @Component filter a second time.
-    @Bean
-    public org.springframework.boot.web.servlet.FilterRegistrationBean<vn.thanhtuanle.security.AccessBanFilter>
-            accessBanFilterRegistration(vn.thanhtuanle.security.AccessBanFilter filter) {
-        var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
-        registration.setOrder(-200);
-        registration.addUrlPatterns("/*");
-        return registration;
-    }
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

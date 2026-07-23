@@ -2,12 +2,18 @@ package vn.thanhtuanle.security;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vn.thanhtuanle.common.payload.PageResponse;
 import vn.thanhtuanle.common.util.ClientMeta;
 import vn.thanhtuanle.entity.LoginAttempt;
+import vn.thanhtuanle.security.dto.AttemptResponse;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /** Audit log of password/Google login attempts. Refresh-token calls are NOT logged (volume). */
@@ -34,6 +40,20 @@ public class LoginAttemptService {
         } catch (Exception e) {
             log.warn("Failed to record login attempt for {}: {}", username, e.getMessage());
         }
+    }
+
+    public PageResponse<AttemptResponse> list(int page, int size, String ip, String username,
+                                              Boolean success, LocalDate createdFrom, LocalDate createdTo) {
+        Page<AttemptResponse> dtoPage = repository
+                .findAll(LoginAttemptSpecifications.filter(ip, username, success, createdFrom, createdTo),
+                        PageRequest.of(page, size, Sort.by("createdAt").descending()))
+                .map(a -> AttemptResponse.builder()
+                        .id(a.getId()).username(a.getUsername()).ip(a.getIp())
+                        .deviceHash(a.getDeviceHash()).userAgent(a.getUserAgent())
+                        .success(a.isSuccess()).errorCode(a.getErrorCode())
+                        .createdAt(a.getCreatedAt())
+                        .build());
+        return PageResponse.of(dtoPage);
     }
 
     /** Nightly retention sweep (03:30 VN time — the app pins Asia/Ho_Chi_Minh). */
