@@ -42,6 +42,7 @@ class SubmissionServiceSubmitTest {
     @Mock UserService userService;
     @Mock ApplicationEventPublisher applicationEventPublisher;
     @Mock SubmissionSseRegistry sseRegistry;
+    @Mock vn.thanhtuanle.security.SubmissionRateLimiter submissionRateLimiter;
 
     @InjectMocks SubmissionService submissionService;
 

@@ -26,6 +26,7 @@ import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 import vn.thanhtuanle.problem.ProblemRepository;
 import vn.thanhtuanle.language.LanguageRepository;
+import vn.thanhtuanle.security.SubmissionRateLimiter;
 
 import vn.thanhtuanle.user.UserService;
 
@@ -44,6 +45,7 @@ public class SubmissionService {
     private final UserService userService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final SubmissionSseRegistry sseRegistry;
+    private final SubmissionRateLimiter submissionRateLimiter;
 
     @Transactional
     public SubmissionResponseDto submit(SubmissionRequestDto req) {
@@ -55,6 +57,10 @@ public class SubmissionService {
         Language language = languageRepository.findByIdentifier(req.getLanguageIdentifier())
                 .orElseThrow(() -> new ResourceNotFoundException("Language not found"));
         User currentUser = userService.getCurrentUser();
+
+        // Cooldown gate: sits after problem/language/user resolve so a 404 never burns it,
+        // and before the row exists so a throttled submit leaves no trace.
+        submissionRateLimiter.acquire(currentUser.getId());
 
         Submission submission = createPendingSubmission(req, problem, language, currentUser);
         submissionRepository.save(submission);
