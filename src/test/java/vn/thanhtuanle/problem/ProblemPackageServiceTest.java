@@ -142,4 +142,23 @@ class ProblemPackageServiceTest {
         assertThatThrownBy(() -> service.parse("plain text".getBytes(StandardCharsets.UTF_8)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void buildPackageBytes_roundTripsThroughParse() throws IOException {
+        CreateProblemDto dto = CreateProblemDto.builder()
+                .title("A plus B").subject("math").description("<p>add</p>")
+                .timeLimit(1000).memoryLimit(256).hardnessLevel(1)
+                .problemSlug("a-plus-b").inputDescription("i").outputDescription("o")
+                .sampleInput("1 2").sampleOutput("3")
+                .build();
+        Map<String, byte[]> testFiles = Map.of(
+                "1.in", "1 2".getBytes(StandardCharsets.UTF_8),
+                "1.out", "3".getBytes(StandardCharsets.UTF_8));
+
+        byte[] zip = service.buildPackageBytes(dto, testFiles);
+        ProblemPackageService.ParsedPackage parsed = service.parse(zip);
+
+        assertThat(parsed.dto().getProblemSlug()).isEqualTo("a-plus-b");
+        assertThat(parsed.testFiles()).containsOnlyKeys("1.in", "1.out");
+    }
 }

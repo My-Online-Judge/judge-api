@@ -6,19 +6,33 @@ import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import vn.thanhtuanle.common.constant.AppProperties;
+import vn.thanhtuanle.common.enums.ProblemStatus;
+import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.common.util.FileUtil;
+import vn.thanhtuanle.entity.Problem;
+import vn.thanhtuanle.entity.TestCase;
 import vn.thanhtuanle.problem.dto.CreateProblemDto;
 import vn.thanhtuanle.problem.dto.ProblemPackageDto;
+import vn.thanhtuanle.problem.dto.ProblemResponseDto;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Parses and produces problem package zips (schemaVersion 1): problem.json at the root
@@ -70,6 +84,74 @@ public class ProblemPackageService {
         CreateProblemDto dto = readProblemJson(problemJson);
         validate(dto);
         return new ParsedPackage(dto, keepCompletePairs(testFiles));
+    }
+
+    @Transactional
+    public ProblemResponseDto importProblem(MultipartFile packageZip, String slugOverride) throws IOException {
+        if (packageZip == null || packageZip.isEmpty()) {
+            throw new IllegalArgumentException("Package file cannot be empty");
+        }
+        ParsedPackage parsed = parse(packageZip.getBytes());
+        CreateProblemDto dto = parsed.dto();
+        if (slugOverride != null && !slugOverride.isBlank()) {
+            dto.setProblemSlug(slugOverride.trim());
+        }
+        log.info("Importing problem package as slug: {}", dto.getProblemSlug());
+        return problemService.createProblem(dto, parsed.testFiles());
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportProblem(String slug) throws IOException {
+        Problem problem = problemRepository.findByProblemSlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Problem not found with slug: " + slug));
+
+        CreateProblemDto dto = CreateProblemDto.builder()
+                .title(problem.getTitle())
+                .subject(problem.getSubject())
+                .description(problem.getDescription())
+                .timeLimit(problem.getTimeLimit())
+                .memoryLimit(problem.getMemoryLimit() != null ? problem.getMemoryLimit().intValue() : 0)
+                .hardnessLevel(problem.getHardnessLevel())
+                .problemSlug(problem.getProblemSlug())
+                .inputDescription(problem.getInputDescription())
+                .outputDescription(problem.getOutputDescription())
+                .sampleInput(problem.getSampleInput())
+                .sampleOutput(problem.getSampleOutput())
+                .hint(problem.getHint())
+                .status(ProblemStatus.fromValue(problem.getStatus()))
+                .build();
+
+        Map<String, byte[]> testFiles = new LinkedHashMap<>();
+        for (TestCase tc : problem.getTestCases()) {
+            testFiles.put(fileNameOf(tc.getInput()), readTestFile(tc.getInput()));
+            testFiles.put(fileNameOf(tc.getOutput()), readTestFile(tc.getOutput()));
+        }
+        log.info("Exporting problem {} with {} test files", slug, testFiles.size());
+        return buildPackageBytes(dto, testFiles);
+    }
+
+    byte[] buildPackageBytes(CreateProblemDto dto, Map<String, byte[]> testFiles) throws IOException {
+        ProblemPackageDto pkg = ProblemPackageDto.builder()
+                .schemaVersion(SCHEMA_VERSION)
+                .problem(dto)
+                .build();
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(bos)) {
+            zos.putNextEntry(new ZipEntry(PROBLEM_JSON));
+            zos.write(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(pkg));
+            zos.closeEntry();
+            for (Map.Entry<String, byte[]> file : testFiles.entrySet()) {
+                zos.putNextEntry(new ZipEntry("testcases/" + file.getKey()));
+                zos.write(file.getValue());
+                zos.closeEntry();
+            }
+        }
+        return bos.toByteArray();
+    }
+
+    /** Fail loudly: a backup with silently missing test data is worse than an error. */
+    private static byte[] readTestFile(String relativePath) throws IOException {
+        return Files.readAllBytes(Paths.get(AppProperties.TEST_CASE_DIR, relativePath));
     }
 
     private Map<String, byte[]> extract(byte[] zipBytes) {
