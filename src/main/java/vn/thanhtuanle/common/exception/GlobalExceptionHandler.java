@@ -77,13 +77,28 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(HttpStatus.CONFLICT.value(), ex.getMessage());
     }
 
+    // More specific than handleAppException — Spring routes RateLimitedException here,
+    // so the Retry-After reflects the actual remaining cooldown instead of a fixed value.
+    @ExceptionHandler(RateLimitedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleRateLimitedException(RateLimitedException ex) {
+        ErrorCode errorCode = ex.getErrorCode();
+        return ResponseEntity
+                .status(errorCode.getStatusCode())
+                .header(org.springframework.http.HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .body(ApiResponse.error(errorCode.getStatusCode().value(), errorCode.getMessage()));
+    }
+
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {
         log.error("AppException: ", ex);
         ErrorCode errorCode = ex.getErrorCode();
-        return ResponseEntity
-                .status(errorCode.getStatusCode())
-                .body(ApiResponse.error(errorCode.getStatusCode().value(), errorCode.getMessage()));
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(errorCode.getStatusCode());
+        if (errorCode == ErrorCode.RATE_LIMITED) {
+            // 429s tell the client when the 15-minute lock will have expired.
+            builder.header(org.springframework.http.HttpHeaders.RETRY_AFTER,
+                    String.valueOf(vn.thanhtuanle.security.LoginRateLimiter.LOCK_SECONDS));
+        }
+        return builder.body(ApiResponse.error(errorCode.getStatusCode().value(), errorCode.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

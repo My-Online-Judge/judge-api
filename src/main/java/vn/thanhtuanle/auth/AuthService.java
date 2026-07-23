@@ -24,6 +24,8 @@ import vn.thanhtuanle.common.util.ClientMeta;
 import vn.thanhtuanle.common.exception.AppException;
 import vn.thanhtuanle.common.exception.ErrorCode;
 import vn.thanhtuanle.common.util.JwtUtil;
+import vn.thanhtuanle.security.LoginAttemptService;
+import vn.thanhtuanle.security.LoginRateLimiter;
 import vn.thanhtuanle.entity.Token;
 import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.repository.TokenRepository;
@@ -52,6 +54,8 @@ public class AuthService {
     private final RestTemplate restTemplate;
     private final TokenBlocklist tokenBlocklist;
     private final PasswordEncoder passwordEncoder;
+    private final LoginRateLimiter loginRateLimiter;
+    private final LoginAttemptService loginAttemptService;
 
     @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String clientId;
@@ -166,7 +170,9 @@ public class AuthService {
         }
 
         // Only active accounts may log in (disabled/soft-deleted users are blocked).
+        // Audited like the password flow; NOT rate-limited — the OAuth code exchange is its own guard.
         if (user.getStatus() == null || user.getStatus() != CommonStatus.ACTIVE.getValue()) {
+            loginAttemptService.record(user.getEmail(), meta, false, ErrorCode.USER_BLOCKED.name());
             throw new AppException(ErrorCode.USER_BLOCKED);
         }
 
@@ -183,6 +189,8 @@ public class AuthService {
         user.setLastLoginDeviceHash(meta.deviceHash());
         userRepository.save(user);
 
+        loginAttemptService.record(user.getEmail(), meta, true, null);
+
         return AuthResponse.builder()
                 .accessToken(jwtToken)
                 .refreshToken(refreshToken)
@@ -197,12 +205,21 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse authenticateWithPassword(String username, String password, ClientMeta meta) {
-        User user = userRepository.findByUsername(username)
-                .filter(u -> u.getPassword() != null && passwordEncoder.matches(password, u.getPassword()))
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        loginRateLimiter.assertAllowed(username, meta);
 
-        if (user.getStatus() == null || user.getStatus() != CommonStatus.ACTIVE.getValue()) {
-            throw new AppException(ErrorCode.USER_BLOCKED);
+        User user;
+        try {
+            user = userRepository.findByUsername(username)
+                    .filter(u -> u.getPassword() != null && passwordEncoder.matches(password, u.getPassword()))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+            if (user.getStatus() == null || user.getStatus() != CommonStatus.ACTIVE.getValue()) {
+                throw new AppException(ErrorCode.USER_BLOCKED);
+            }
+        } catch (AppException e) {
+            loginRateLimiter.recordFailure(username, meta);
+            loginAttemptService.record(username, meta, false, e.getErrorCode().name());
+            throw e;
         }
 
         String accessToken = jwtUtil.generateToken(user);
@@ -216,6 +233,9 @@ public class AuthService {
         user.setLastLoginIp(meta.ip());
         user.setLastLoginDeviceHash(meta.deviceHash());
         userRepository.save(user);
+
+        loginRateLimiter.clear(username);
+        loginAttemptService.record(username, meta, true, null);
 
         log.info("Password login for user: {}", username);
         return AuthResponse.builder()
