@@ -69,11 +69,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ResourceAlreadyExistException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.CONFLICT)
     public ApiResponse<Object> handleResourceAlreadyExistException(
             ResourceAlreadyExistException ex) {
         log.error("Resource Already Exist: ", ex);
-        return ApiResponse.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
+        return ApiResponse.error(HttpStatus.CONFLICT.value(), ex.getMessage());
     }
 
     @ExceptionHandler(AppException.class)
