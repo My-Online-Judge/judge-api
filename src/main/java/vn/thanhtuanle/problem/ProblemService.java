@@ -53,17 +53,26 @@ public class ProblemService {
 
     @Transactional
     public ProblemResponseDto createProblem(CreateProblemDto dto, MultipartFile zipFile) throws IOException {
+        if (zipFile == null || zipFile.isEmpty()) {
+            throw new IllegalArgumentException("Zip file cannot be empty");
+        }
+        log.info("Extracting zip file for problem: {}", dto.getProblemSlug());
+        return createProblem(dto, FileUtil.extractZip(zipFile));
+    }
+
+    @Transactional
+    public ProblemResponseDto createProblem(CreateProblemDto dto, Map<String, byte[]> extractedFiles) {
         log.info("Starting createProblem logic for: {}", dto.getProblemSlug());
 
-        validateCreateRequest(dto, zipFile);
+        if (problemRepository.existsByProblemSlug(dto.getProblemSlug())) {
+            throw new ResourceAlreadyExistException("Problem slug already exists: " + dto.getProblemSlug());
+        }
 
         Problem problem = problemMapper.toEntity(dto);
         problem.setTestCases(new ArrayList<>());
 
         String destDirPath = String.format("%s/%s", AppProperties.TEST_CASE_DIR, dto.getProblemSlug());
-
-        // Process files
-        processTestCases(zipFile, problem, destDirPath);
+        processTestCases(extractedFiles, problem, destDirPath);
 
         // Run async to generate info file
         infoGenerator.generateInfo(dto.getProblemSlug().trim());
@@ -77,23 +86,7 @@ public class ProblemService {
         return problemMapper.toDto(savedProblem);
     }
 
-    private void validateCreateRequest(CreateProblemDto dto, MultipartFile zipFile) {
-        if (problemRepository.existsByProblemSlug(dto.getProblemSlug())) {
-            throw new ResourceAlreadyExistException("Problem slug already exists: " + dto.getProblemSlug());
-        }
-
-        if (zipFile == null || zipFile.isEmpty()) {
-            throw new IllegalArgumentException("Zip file cannot be empty");
-        }
-    }
-
-    private void processTestCases(MultipartFile zipFile, Problem problem, String destDirPath) throws IOException {
-        // Extract zip to memory
-        log.info("Extracting zip file for problem: {}", problem.getProblemSlug());
-        Map<String, byte[]> extractedFiles = FileUtil.extractZip(zipFile);
-        log.info("Extracted {} files from zip.", extractedFiles.size());
-
-        // Filter files
+    private void processTestCases(Map<String, byte[]> extractedFiles, Problem problem, String destDirPath) {
         Map<String, byte[]> inputFiles = new HashMap<>();
         Map<String, byte[]> outputFiles = new HashMap<>();
 
