@@ -12,6 +12,7 @@ import vn.thanhtuanle.common.util.FileUtil;
 import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.TestCase;
+import vn.thanhtuanle.problem.dto.TestCaseContext;
 import vn.thanhtuanle.problem.dto.TestCaseResponse;
 
 import java.io.IOException;
@@ -58,11 +59,30 @@ public class TestCaseService {
                     .name(baseNameOf(tc.getInput()))
                     .input(readContentQuietly(tc.getInput()))
                     .output(readContentQuietly(tc.getOutput()))
+                    .sample(tc.isSample())
                     .build());
         }
         result.sort(BY_NUMERIC_NAME);
         log.info("End list test cases for problem: {} (count={})", slug, result.size());
         return result;
+    }
+
+    /**
+     * Numeric base name ("1", "2") -> visibility + contents, for correlating judge results back
+     * to test cases. The judge reports {@code test_case} as the file stem, not a UUID, so this
+     * is the only available join key.
+     */
+    public Map<String, TestCaseContext> contextByName(Problem problem) {
+        Map<String, TestCaseContext> byName = new HashMap<>();
+        for (TestCase tc : problem.getTestCases()) {
+            String name = baseNameOf(tc.getInput());
+            byName.put(name, tc.isSample()
+                    ? new TestCaseContext(true,
+                            readContentQuietly(tc.getInput()),
+                            readContentQuietly(tc.getOutput()))
+                    : TestCaseContext.hidden());
+        }
+        return byName;
     }
 
     @Transactional
@@ -219,6 +239,7 @@ public class TestCaseService {
                 .name(baseNameOf(tc.getInput()))
                 .input(new String(inBytes, StandardCharsets.UTF_8))
                 .output(new String(outBytes, StandardCharsets.UTF_8))
+                .sample(tc.isSample())
                 .build();
     }
 
