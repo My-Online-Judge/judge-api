@@ -95,6 +95,7 @@ public class ProblemPackageService {
         CreateProblemDto dto = parsed.dto();
         if (slugOverride != null && !slugOverride.isBlank()) {
             dto.setProblemSlug(slugOverride.trim());
+            validate(dto);
         }
         log.info("Importing problem package as slug: {}", dto.getProblemSlug());
         return problemService.createProblem(dto, parsed.testFiles());

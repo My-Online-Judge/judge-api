@@ -4,8 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.mock.web.MockMultipartFile;
 
 import vn.thanhtuanle.problem.dto.CreateProblemDto;
+import vn.thanhtuanle.problem.dto.ProblemResponseDto;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -17,6 +20,11 @@ import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class ProblemPackageServiceTest {
 
@@ -160,5 +168,44 @@ class ProblemPackageServiceTest {
 
         assertThat(parsed.dto().getProblemSlug()).isEqualTo("a-plus-b");
         assertThat(parsed.testFiles()).containsOnlyKeys("1.in", "1.out");
+    }
+
+    @Test
+    void importProblem_pathTraversalSlugOverride_throws() throws IOException {
+        ProblemService problemService = mock(ProblemService.class);
+        ProblemPackageService importService =
+                new ProblemPackageService(objectMapper, validator, problemService, null);
+        MockMultipartFile file =
+                new MockMultipartFile("file", "pkg.zip", "application/zip", zipOf(validEntries()));
+
+        assertThatThrownBy(() -> importService.importProblem(file, "../../../../tmp/pwned"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Problem slug must contain only alphanumeric characters and hyphens");
+    }
+
+    @Test
+    void importProblem_validSlugOverride_appliedToDtoPassedToProblemService() throws IOException {
+        ProblemService problemService = mock(ProblemService.class);
+        when(problemService.createProblem(any(), anyMap()))
+                .thenReturn(ProblemResponseDto.builder().build());
+        ProblemPackageService importService =
+                new ProblemPackageService(objectMapper, validator, problemService, null);
+        MockMultipartFile file =
+                new MockMultipartFile("file", "pkg.zip", "application/zip", zipOf(validEntries()));
+
+        importService.importProblem(file, "my-new-slug");
+
+        ArgumentCaptor<CreateProblemDto> dtoCaptor = ArgumentCaptor.forClass(CreateProblemDto.class);
+        verify(problemService).createProblem(dtoCaptor.capture(), anyMap());
+        assertThat(dtoCaptor.getValue().getProblemSlug()).isEqualTo("my-new-slug");
+    }
+
+    @Test
+    void importProblem_emptyPackage_throws() {
+        MockMultipartFile empty = new MockMultipartFile("file", "pkg.zip", "application/zip", new byte[0]);
+
+        assertThatThrownBy(() -> service.importProblem(empty, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("empty");
     }
 }
