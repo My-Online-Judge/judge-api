@@ -1,5 +1,6 @@
 package vn.thanhtuanle.submission;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -7,6 +8,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -25,9 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +39,9 @@ class SubmissionReconcileJobTest {
     @Mock VerdictPubSub verdictPubSub;
     @Mock SubmissionMapper submissionMapper;
     @Mock SubmissionDetailAssembler detailAssembler;
+    @Mock StringRedisTemplate redisTemplate;
+    @Mock SubmissionSseRegistry sseRegistry;
+    final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     @InjectMocks SubmissionReconcileJob job;
 
     @BeforeEach
@@ -62,28 +66,41 @@ class SubmissionReconcileJobTest {
         assertThat(stuck.getErrorMessage()).contains("timed out");
         verify(submissionRepository).save(stuck);
         verify(verdictPubSub).publishAfterCommit(id.toString(), dto);
+        // Pins the two-arg mapper call: the payload shape must stay uniform with the consumer's
+        // (submissionMapper.toDto(submission, detailAssembler.assemble(submission))), not silently
+        // regress to the one-arg mapper, which would pass this stubbing identically.
+        verify(detailAssembler).assemble(stuck);
     }
 
     @Test
-    void publishesReconciledVerdict_onlyAfterCommit() {
-        // reconcileStuck is @Transactional and may flip N submissions before its commit:
-        // publishing mid-loop would let a subscriber's fresh re-read still see PENDING while
-        // the live publish has already passed it by (same lost-verdict window as the consumer).
-        UUID id = UUID.randomUUID();
-        Submission stuck = Submission.builder().status(SubmissionResult.PENDING.getValue()).build();
-        stuck.setId(id);
+    void publishesReconciledVerdict_onlyAfterCommit_forEveryStuckSubmission() {
+        // reconcileStuck is @Transactional and flips N stuck submissions in a loop before its
+        // single commit: publishing mid-loop would let a subscriber's fresh re-read still see
+        // PENDING while the live publish has already passed it by (same lost-verdict window as
+        // the consumer). Two stuck submissions here pin that the loop registers ONE deferred
+        // publish PER iteration — not just that a single-element case happens to defer.
+        UUID id1 = UUID.randomUUID();
+        UUID id2 = UUID.randomUUID();
+        Submission stuck1 = Submission.builder().status(SubmissionResult.PENDING.getValue()).build();
+        stuck1.setId(id1);
+        Submission stuck2 = Submission.builder().status(SubmissionResult.PENDING.getValue()).build();
+        stuck2.setId(id2);
         when(submissionRepository.findStuck(anyCollection(), any(LocalDateTime.class)))
-                .thenReturn(List.of(stuck));
-        SubmissionResponseDto dto = SubmissionResponseDto.builder()
+                .thenReturn(List.of(stuck1, stuck2));
+        SubmissionResponseDto dto1 = SubmissionResponseDto.builder()
                 .status(SubmissionResult.SYSTEM_ERROR.getValue()).build();
-        when(submissionMapper.toDto(eq(stuck), any())).thenReturn(dto);
+        SubmissionResponseDto dto2 = SubmissionResponseDto.builder()
+                .status(SubmissionResult.SYSTEM_ERROR.getValue()).build();
+        when(submissionMapper.toDto(eq(stuck1), any())).thenReturn(dto1);
+        when(submissionMapper.toDto(eq(stuck2), any())).thenReturn(dto2);
 
-        // Real VerdictPubSub so its after-commit deferral actually runs; publish itself is
-        // stubbed out (no Redis in unit tests).
-        VerdictPubSub deferringPubSub = spy(new VerdictPubSub(null, null, null));
-        doNothing().when(deferringPubSub).publish(any(), any());
+        // Real VerdictPubSub (not a spy on `publish` — it is package-private now, and this test
+        // lives outside vn.thanhtuanle.messaging) wired to a mocked Redis template, so the
+        // wire-level effect of each deferred publish is observable via convertAndSend, the same
+        // way VerdictPubSubTest asserts it.
+        VerdictPubSub realPubSub = new VerdictPubSub(redisTemplate, objectMapper, sseRegistry);
         SubmissionReconcileJob txJob = new SubmissionReconcileJob(
-                submissionRepository, deferringPubSub, submissionMapper, detailAssembler);
+                submissionRepository, realPubSub, submissionMapper, detailAssembler);
         ReflectionTestUtils.setField(txJob, "stuckTimeoutMin", 5L);
 
         // Simulate the @Transactional wrapper: synchronization active during reconcileStuck.
@@ -91,10 +108,13 @@ class SubmissionReconcileJobTest {
         try {
             txJob.reconcileStuck();
 
-            // State write happened inside the transaction…
-            verify(submissionRepository).save(stuck);
-            // …but nothing may be published before the commit.
-            verify(deferringPubSub, never()).publish(any(), any());
+            // Both state writes happened inside the transaction…
+            verify(submissionRepository).save(stuck1);
+            verify(submissionRepository).save(stuck2);
+            // …but nothing may reach the wire before commit, for either submission.
+            verify(redisTemplate, never()).convertAndSend(any(), any());
+            // One deferred registration per loop iteration — not one for the whole batch.
+            assertThat(TransactionSynchronizationManager.getSynchronizations()).hasSize(2);
 
             for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
                 sync.afterCommit();
@@ -103,7 +123,12 @@ class SubmissionReconcileJobTest {
             TransactionSynchronizationManager.clearSynchronization();
         }
 
-        verify(deferringPubSub).publish(id.toString(), dto);
+        ArgumentCaptor<String> bodies = ArgumentCaptor.forClass(String.class);
+        verify(redisTemplate, times(2)).convertAndSend(eq(VerdictPubSub.CHANNEL), bodies.capture());
+        assertThat(bodies.getAllValues())
+                .hasSize(2)
+                .anySatisfy(body -> assertThat(body).contains(id1.toString()))
+                .anySatisfy(body -> assertThat(body).contains(id2.toString()));
     }
 
     @Test

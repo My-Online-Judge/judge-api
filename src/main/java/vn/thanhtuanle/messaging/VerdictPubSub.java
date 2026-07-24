@@ -33,8 +33,17 @@ public class VerdictPubSub implements MessageListener {
     private final ObjectMapper objectMapper;
     private final SubmissionSseRegistry sseRegistry;
 
-    /** Broadcast a verdict to every instance so whichever one holds the SSE emitter delivers it. */
-    public void publish(String submissionId, SubmissionResponseDto payload) {
+    /**
+     * Broadcast a verdict to every instance so whichever one holds the SSE emitter delivers it.
+     *
+     * <p>Package-private on purpose: every publish that follows a state write MUST go through
+     * {@link #publishAfterCommit} instead, and this visibility makes that a compile error for
+     * any caller outside this package rather than a convention someone can forget (as
+     * {@code SubmissionReconcileJob} once did). Direct callers within this package (this class,
+     * and this package's own tests) are the deferral mechanism itself and the no-transaction
+     * immediate-publish path — never a second, competing writer.
+     */
+    void publish(String submissionId, SubmissionResponseDto payload) {
         try {
             String body = objectMapper.writeValueAsString(new VerdictMessage(submissionId, payload));
             redisTemplate.convertAndSend(CHANNEL, body);
@@ -51,7 +60,9 @@ public class VerdictPubSub implements MessageListener {
      * the live publish has already passed its emitter by. Post-commit, a subscriber either
      * registered before the publish (receives it live) or re-reads after the commit (sees the
      * terminal row, replays). Every publish that follows a state write MUST go through this method,
-     * never through {@link #publish} directly.
+     * never through {@link #publish} directly — and since {@link #publish} is package-private,
+     * that rule is enforced by the compiler for every caller outside this package, not left to
+     * convention or review.
      */
     public void publishAfterCommit(String submissionId, SubmissionResponseDto payload) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
