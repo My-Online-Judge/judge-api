@@ -56,7 +56,13 @@ logging:
 application:
   security:
     jwt:
-      secret-key: ${JWT_SECRET_KEY}
+      # Legacy HS256 fallback. Leave JWT_SECRET_KEY set for <=3 days after the RS256
+      # deploy (old refresh tokens are still live), then remove the env var to end
+      # dual-verify — an empty value disables HS256 verification entirely.
+      secret-key: ${JWT_SECRET_KEY:}
+      rsa:
+        private-key: ${JWT_RSA_PRIVATE_KEY}
+        public-key: ${JWT_RSA_PUBLIC_KEY}
       expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
       refresh-token:
         expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
