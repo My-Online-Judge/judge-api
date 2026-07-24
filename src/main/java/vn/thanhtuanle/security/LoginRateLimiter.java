@@ -1,5 +1,6 @@
 package vn.thanhtuanle.security;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -34,11 +35,15 @@ public class LoginRateLimiter {
     public static final long LOCK_SECONDS = LOCK.toSeconds();
 
     private final StringRedisTemplate redis;
-    private final MeterRegistry registry;
+    private final Counter throttled;
 
     public LoginRateLimiter(StringRedisTemplate redis, MeterRegistry registry) {
         this.redis = redis;
-        this.registry = registry;
+        // Eager registration so the series exists at 0 from boot — see SubmissionRateLimiter for why
+        // a lazily-created counter makes its alert unfireable.
+        this.throttled = Counter.builder("oj.login.rate_limited")
+                .description("Login attempts rejected while a lockout was in force")
+                .register(registry);
     }
 
     /** Throws 429 RATE_LIMITED when any dimension of this attempt is locked. */
@@ -51,7 +56,7 @@ public class LoginRateLimiter {
             return;
         }
         if (locked) {
-            registry.counter("oj.login.rate_limited").increment();
+            throttled.increment();
             throw new AppException(ErrorCode.RATE_LIMITED);
         }
     }

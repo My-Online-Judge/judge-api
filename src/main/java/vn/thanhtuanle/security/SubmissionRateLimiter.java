@@ -1,5 +1,6 @@
 package vn.thanhtuanle.security;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,13 +25,18 @@ public class SubmissionRateLimiter {
     static final String KEY_PREFIX = "oj:rl:submit:";
 
     private final StringRedisTemplate redis;
-    private final MeterRegistry registry;
+    private final Counter throttled;
     private final long cooldownSeconds;
 
     public SubmissionRateLimiter(StringRedisTemplate redis, MeterRegistry registry,
                                  @Value("${oj.submission.cooldown-seconds:10}") long cooldownSeconds) {
         this.redis = redis;
-        this.registry = registry;
+        // Registered at startup, not on first throttle: a lazily-created counter is absent from
+        // /actuator/prometheus until it first increments, and Prometheus cannot tell "never happened"
+        // from "not exposed" — any alert on it would sit in no-data instead of firing.
+        this.throttled = Counter.builder("oj.submission.rate_limited")
+                .description("Submissions rejected by the per-user cooldown")
+                .register(registry);
         this.cooldownSeconds = cooldownSeconds;
     }
 
@@ -49,7 +55,7 @@ public class SubmissionRateLimiter {
             return;
         }
         long retryAfter = (remaining == null || remaining < 1) ? 1 : remaining;
-        registry.counter("oj.submission.rate_limited").increment();
+        throttled.increment();
         throw new RateLimitedException(ErrorCode.SUBMISSION_RATE_LIMITED, retryAfter);
     }
 }
