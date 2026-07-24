@@ -178,6 +178,35 @@ public class TestCaseService {
         log.info("End delete test case {} for problem: {}", testCaseId, slug);
     }
 
+    /**
+     * Toggle whether a test case's input/output may be shown to users. Deliberately does NOT
+     * regenerate the info file or republish the bundle — visibility is database-only metadata,
+     * and changing the bundle hash would force a needless re-judge.
+     */
+    @Transactional
+    public TestCaseResponse setSample(String slug, UUID testCaseId, boolean sample) {
+        log.info("Start set sample={} for test case {} of problem: {}", sample, testCaseId, slug);
+        TestCase tc = testCaseRepository.findById(testCaseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Test case not found: " + testCaseId));
+
+        // Ownership check: the test case must belong to the {slug} problem.
+        if (tc.getProblem() == null || !slug.equals(tc.getProblem().getProblemSlug())) {
+            throw new ResourceNotFoundException(
+                    "Test case " + testCaseId + " not found for problem " + slug);
+        }
+
+        tc.setSample(sample);
+        testCaseRepository.save(tc);
+        log.info("End set sample={} for test case {} of problem: {}", sample, testCaseId, slug);
+        return TestCaseResponse.builder()
+                .id(tc.getId())
+                .name(baseNameOf(tc.getInput()))
+                .input(readContentQuietly(tc.getInput()))
+                .output(readContentQuietly(tc.getOutput()))
+                .sample(tc.isSample())
+                .build();
+    }
+
     // --- persistence / IO helpers -------------------------------------------------------------
 
     private TestCase persistTestCase(Problem problem, String slug, int index, byte[] inBytes, byte[] outBytes)
