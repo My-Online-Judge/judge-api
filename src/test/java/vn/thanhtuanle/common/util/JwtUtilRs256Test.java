@@ -44,6 +44,19 @@ class JwtUtilRs256Test {
         return Base64.getEncoder().encodeToString(pem.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Same PEM body as {@link #pemBase64}, but the OUTER encode is line-wrapped at 76 chars —
+     * what plain {@code base64} (no {@code -w0}) produces, as opposed to the unwrapped
+     * {@code base64 -w0} the design doc tells operators to use.
+     */
+    private static String pemBase64LineWrapped(String type, byte[] der) {
+        String pem = "-----BEGIN " + type + "-----\n"
+                + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8)).encodeToString(der)
+                + "\n-----END " + type + "-----\n";
+        return Base64.getMimeEncoder(76, "\n".getBytes(StandardCharsets.UTF_8))
+                .encodeToString(pem.getBytes(StandardCharsets.UTF_8));
+    }
+
     private static JwtUtil newJwtUtil(KeyPair pair, String legacySecret) {
         JwtUtil util = new JwtUtil();
         ReflectionTestUtils.setField(util, "rsaPrivateKeyPem", pemBase64("PRIVATE KEY", pair.getPrivate().getEncoded()));
@@ -154,5 +167,79 @@ class JwtUtilRs256Test {
         ReflectionTestUtils.setField(util, "rsaPublicKeyPem", "bm90LWEta2V5");
         ReflectionTestUtils.setField(util, "secretKey", "");
         assertThatThrownBy(util::init).isInstanceOf(IllegalStateException.class);
+    }
+
+    /**
+     * Task 1 review, Finding 1: the outer decode of the env value must tolerate a
+     * line-wrapped base64 blob (what plain {@code base64}, without {@code -w0}, produces) —
+     * not just the unwrapped form.
+     */
+    @Test
+    void lineWrappedOuterBase64IsAccepted() throws Exception {
+        KeyPair pair = rsaPair();
+        JwtUtil util = new JwtUtil();
+        ReflectionTestUtils.setField(util, "rsaPrivateKeyPem",
+                pemBase64LineWrapped("PRIVATE KEY", pair.getPrivate().getEncoded()));
+        ReflectionTestUtils.setField(util, "rsaPublicKeyPem",
+                pemBase64LineWrapped("PUBLIC KEY", pair.getPublic().getEncoded()));
+        ReflectionTestUtils.setField(util, "secretKey", "");
+        ReflectionTestUtils.setField(util, "jwtExpiration", 900000L);
+        ReflectionTestUtils.setField(util, "refreshExpiration", 259200000L);
+        util.init();
+
+        String token = util.generateToken(alice());
+        assertThat(util.extractUsername(token)).isEqualTo("alice@example.com");
+    }
+
+    /**
+     * Task 1 review, Finding 2: a well-formed but mismatched private/public keypair must fail
+     * fast at boot instead of booting cleanly and then failing every request's signature check.
+     */
+    @Test
+    void mismatchedRsaKeypairFailsAtBoot() throws Exception {
+        KeyPair pairA = rsaPair();
+        KeyPair pairB = rsaPair();
+        JwtUtil util = new JwtUtil();
+        ReflectionTestUtils.setField(util, "rsaPrivateKeyPem",
+                pemBase64("PRIVATE KEY", pairA.getPrivate().getEncoded()));
+        ReflectionTestUtils.setField(util, "rsaPublicKeyPem",
+                pemBase64("PUBLIC KEY", pairB.getPublic().getEncoded()));
+        ReflectionTestUtils.setField(util, "secretKey", "");
+        ReflectionTestUtils.setField(util, "jwtExpiration", 900000L);
+        ReflectionTestUtils.setField(util, "refreshExpiration", 259200000L);
+
+        assertThatThrownBy(util::init)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not a matching pair");
+    }
+
+    /**
+     * Cheap regression guard: whatever the mismatched-keypair message says, it must never
+     * echo key material (base64 of the PEM, or the raw PEM body) back to the caller/logs.
+     */
+    @Test
+    void mismatchedKeypairMessageLeaksNoKeyMaterial() throws Exception {
+        KeyPair pairA = rsaPair();
+        KeyPair pairB = rsaPair();
+        String privatePem = pemBase64("PRIVATE KEY", pairA.getPrivate().getEncoded());
+        String publicPem = pemBase64("PUBLIC KEY", pairB.getPublic().getEncoded());
+
+        JwtUtil util = new JwtUtil();
+        ReflectionTestUtils.setField(util, "rsaPrivateKeyPem", privatePem);
+        ReflectionTestUtils.setField(util, "rsaPublicKeyPem", publicPem);
+        ReflectionTestUtils.setField(util, "secretKey", "");
+        ReflectionTestUtils.setField(util, "jwtExpiration", 900000L);
+        ReflectionTestUtils.setField(util, "refreshExpiration", 259200000L);
+
+        assertThatThrownBy(util::init)
+                .isInstanceOf(IllegalStateException.class)
+                .satisfies(ex -> {
+                    String message = ex.getMessage();
+                    assertThat(message).doesNotContain(privatePem);
+                    assertThat(message).doesNotContain(publicPem);
+                    // Also guard against leaking a raw base64 fragment of the DER itself.
+                    assertThat(message).doesNotContain(
+                            Base64.getEncoder().encodeToString(pairA.getPrivate().getEncoded()).substring(0, 40));
+                });
     }
 }

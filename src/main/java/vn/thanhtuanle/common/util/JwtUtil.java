@@ -75,6 +75,27 @@ public class JwtUtil {
             throw new IllegalStateException(
                     "Invalid or missing RSA JWT keys (JWT_RSA_PRIVATE_KEY / JWT_RSA_PUBLIC_KEY)", e);
         }
+        verifyKeypairMatches();
+    }
+
+    /**
+     * Canary check: two well-formed RSA keys that are not actually a pair parse individually
+     * without error, so the failure above would otherwise stay silent at boot and only surface
+     * as a {@code SignatureException} on every request's signature check from then on. Signing
+     * a throwaway token with the private key and verifying it with the public key catches that
+     * mismatch here instead, while the app can still refuse to boot.
+     */
+    private void verifyKeypairMatches() {
+        try {
+            String canary = Jwts.builder()
+                    .setSubject("jwt-keypair-canary")
+                    .signWith(rsaPrivateKey, SignatureAlgorithm.RS256)
+                    .compact();
+            Jwts.parserBuilder().setSigningKey(rsaPublicKey).build().parseClaimsJws(canary);
+        } catch (Exception e) {
+            // No key material in the message: only a fixed, human-readable diagnosis.
+            throw new IllegalStateException("RSA private and public keys are not a matching pair", e);
+        }
     }
 
     /** kid stamped into every token header — first 16 hex chars of SHA-256(publicKey DER). */
@@ -82,9 +103,16 @@ public class JwtUtil {
         return keyId;
     }
 
-    /** env value = base64(PEM file); strip the armor, decode the DER body. */
+    /**
+     * env value = base64(PEM file); strip the armor, decode the DER body.
+     *
+     * <p>The outer decode uses the MIME decoder, which ignores whitespace/newlines: operators
+     * following the design doc's {@code base64 -w0} get an unwrapped blob, but plain
+     * {@code base64} (no flag) line-wraps at 76 chars, and both must decode cleanly rather than
+     * bricking boot with an error that reads like a corrupt key.
+     */
     private static byte[] decodePem(String base64Pem, String type) {
-        String pem = new String(java.util.Base64.getDecoder().decode(base64Pem), StandardCharsets.UTF_8);
+        String pem = new String(java.util.Base64.getMimeDecoder().decode(base64Pem), StandardCharsets.UTF_8);
         String body = pem
                 .replace("-----BEGIN " + type + "-----", "")
                 .replace("-----END " + type + "-----", "")
