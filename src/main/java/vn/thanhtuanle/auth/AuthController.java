@@ -124,9 +124,9 @@ public class AuthController {
         return ApiResponse.success(authService.introspect(request));
     }
 
-    @Operation(summary = "Refresh access token", description = "Exchange a valid refresh token for a new access token")
+    @Operation(summary = "Refresh access token", description = "Exchange a valid refresh token for a new access token, set as an HttpOnly cookie")
     @PostMapping("/refresh")
-    public ApiResponse<AuthResponse> refresh(
+    public ApiResponse<Void> refresh(
             @CookieValue(value = REFRESH_TOKEN_COOKIE, required = false) String refreshCookie,
             @RequestBody(required = false) Map<String, String> body,
             HttpServletRequest httpRequest,
@@ -135,7 +135,11 @@ public class AuthController {
                 : (body != null ? body.get("refreshToken") : null);
         var authResponse = authService.refreshAccessToken(refreshToken, ClientMeta.from(httpRequest));
         addCookie(response, ACCESS_TOKEN_COOKIE, authResponse.getAccessToken(), ACCESS_TOKEN_MAX_AGE);
-        return ApiResponse.success(authResponse);
+        // Token material never rides in the response body: the cookie above is the only
+        // thing the caller needs, and putting tokens in JS-readable JSON would defeat the
+        // HttpOnly cookie design the moment any XSS can POST here (which auto-refresh-on-401
+        // now makes routine, not rare).
+        return ApiResponse.success();
     }
 
     @Operation(summary = "Me", description = "Get current user info")

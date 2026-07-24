@@ -22,13 +22,16 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
             AuthenticationException authException) throws IOException, ServletException {
-        log.error("Unauthorized error: {}", authException.getMessage());
+        log.warn("Unauthenticated request to {}: {}", request.getRequestURI(), authException.getMessage());
 
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN); // Return 403 as requested
+        // 401, not 403: the caller has no valid authentication, which a token refresh
+        // can fix. 403 is reserved for CustomAccessDeniedHandler (authenticated but
+        // lacking the required permission) — the portal must not retry those.
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        ApiResponse<Object> apiResponse = ApiResponse.error(HttpServletResponse.SC_FORBIDDEN,
-                "Access Denied: " + authException.getMessage());
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpServletResponse.SC_UNAUTHORIZED,
+                "Unauthorized: " + authException.getMessage());
 
         response.getWriter().write(objectMapper.writeValueAsString(apiResponse));
     }

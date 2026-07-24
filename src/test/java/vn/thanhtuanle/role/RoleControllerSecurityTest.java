@@ -55,4 +55,13 @@ class RoleControllerSecurityTest {
     void forbidden_withWrongPermission() throws Exception {
         mockMvc.perform(get("/api/v1/roles")).andExpect(status().isForbidden());
     }
+
+    @Test
+    void unauthorized_withNoToken() throws Exception {
+        // No @WithMockUser: this exercises the real filter chain (JwtAuthenticationFilter +
+        // CustomAuthenticationEntryPoint) end to end, not just the entry point bean in
+        // isolation. 401 = "not authenticated, go refresh" -- distinct from the 403 RBAC
+        // denials above, which must stay 403.
+        mockMvc.perform(get("/api/v1/roles")).andExpect(status().isUnauthorized());
+    }
 }
