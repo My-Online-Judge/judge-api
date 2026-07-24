@@ -61,7 +61,9 @@ class JudgeResultConsumerTest {
         assertThat(s.getTime()).isEqualTo(15);
         assertThat(s.getMemory()).isEqualTo(3072L);
         verify(submissionRepository).save(s);
-        verify(verdictPubSub).publish(id.toString(), dto);
+        // Routed through the after-commit entry point; with no active transaction it
+        // degenerates to an immediate publish (see VerdictPubSubTest).
+        verify(verdictPubSub).publishAfterCommit(id.toString(), dto);
     }
 
     @Test
@@ -77,7 +79,7 @@ class JudgeResultConsumerTest {
 
         assertThat(s.getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
         verify(submissionRepository, never()).save(any());
-        verify(verdictPubSub, never()).publish(any(), any());
+        verify(verdictPubSub, never()).publishAfterCommit(any(), any());
     }
 
     @Test
@@ -94,6 +96,6 @@ class JudgeResultConsumerTest {
 
         assertThat(s.getStatus()).isEqualTo(SubmissionResult.ACCEPTED.getValue());
         verify(submissionRepository, never()).save(any());
-        verify(verdictPubSub, never()).publish(any(), any());
+        verify(verdictPubSub, never()).publishAfterCommit(any(), any());
     }
 }

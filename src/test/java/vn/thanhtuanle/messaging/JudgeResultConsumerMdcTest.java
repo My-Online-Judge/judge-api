@@ -37,7 +37,7 @@ class JudgeResultConsumerMdcTest {
 
         AtomicReference<String> mdcDuring = new AtomicReference<>();
         doAnswer(inv -> { mdcDuring.set(MDC.get("submissionId")); return null; })
-                .when(pubSub).publish(any(), any());
+                .when(pubSub).publishAfterCommit(any(), any());
 
         JudgeResultConsumer consumer = new JudgeResultConsumer(repo, pubSub, mapper, metrics, detailAssembler);
         SubmissionJudgedEvent event = new SubmissionJudgedEvent();

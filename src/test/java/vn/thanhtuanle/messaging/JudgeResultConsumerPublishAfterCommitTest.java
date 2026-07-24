@@ -2,7 +2,6 @@ package vn.thanhtuanle.messaging;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -23,7 +22,9 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,16 +33,17 @@ import static org.mockito.Mockito.when;
  * while the consumer's transaction is still open — a subscriber's fresh read in that window
  * would still see PENDING (the update is uncommitted) yet the live publish would already have
  * passed it by, losing the verdict. The publish must fire only in afterCommit().
+ *
+ * <p>Uses a real (spied) {@link VerdictPubSub} so the after-commit deferral actually runs —
+ * the pin is end-to-end through the consumer, not on which method the consumer happens to call.
  */
 @ExtendWith(MockitoExtension.class)
 class JudgeResultConsumerPublishAfterCommitTest {
 
     @Mock SubmissionRepository submissionRepository;
-    @Mock VerdictPubSub verdictPubSub;
     @Mock SubmissionMapper submissionMapper;
     @Mock OjMetrics ojMetrics;
     @Mock SubmissionDetailAssembler detailAssembler;
-    @InjectMocks JudgeResultConsumer consumer;
 
     @Test
     void withActiveTransaction_publishesOnlyAfterCommit() {
@@ -55,6 +57,12 @@ class JudgeResultConsumerPublishAfterCommitTest {
         SubmissionResponseDto dto = SubmissionResponseDto.builder()
                 .status(SubmissionResult.ACCEPTED.getValue()).build();
         when(submissionMapper.toDto(eq(s), any())).thenReturn(dto);
+
+        // Real deferral logic; the wire-level publish itself is stubbed (no Redis here).
+        VerdictPubSub verdictPubSub = spy(new VerdictPubSub(null, null, null));
+        doNothing().when(verdictPubSub).publish(any(), any());
+        JudgeResultConsumer consumer = new JudgeResultConsumer(
+                submissionRepository, verdictPubSub, submissionMapper, ojMetrics, detailAssembler);
 
         SubmissionJudgedEvent e = SubmissionJudgedEvent.builder()
                 .submissionId(id.toString()).status(SubmissionResult.ACCEPTED.getValue())
@@ -82,5 +90,6 @@ class JudgeResultConsumerPublishAfterCommitTest {
     }
 
     // The no-transaction path (unit tests, direct calls) publishing immediately is covered by
+    // VerdictPubSubTest.publishAfterCommit_withoutTransaction_publishesImmediately and
     // JudgeResultConsumerTest.appliesVerdict_whenPending — not duplicated here.
 }

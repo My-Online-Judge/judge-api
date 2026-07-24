@@ -120,7 +120,8 @@ public class SubmissionService {
         // fails either check (registering first would let a denied/unknown request evict a
         // legitimate owner's live emitter — an eviction DoS). This first read ONLY authorizes;
         // it is never the basis for the replay decision.
-        Submission submission = submissionRepository.findById(UUID.fromString(id))
+        UUID submissionId = UUID.fromString(id);
+        Submission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + id));
         assertCanRead(submission, id);
 
@@ -131,12 +132,12 @@ public class SubmissionService {
         // the already-managed (stale) instance without touching the database. The scalar status
         // query below always hits the database (see the warning on findStatusById), so it sees
         // the committed verdict; refresh() then forces a DB re-read into the managed instance
-        // so the replay payload matches. Together with the consumer publishing only AFTER its
-        // commit (JudgeResultConsumer.publishAfterCommit), this closes the race completely: a
+        // so the replay payload matches. Together with writers publishing only AFTER their
+        // commit (VerdictPubSub.publishAfterCommit), this closes the race completely: a
         // subscriber either registers before the post-commit publish (receives it live) or
         // re-reads after the commit (sees terminal here and replays).
         SseEmitter emitter = sseRegistry.subscribe(id);
-        Integer freshStatus = submissionRepository.findStatusById(UUID.fromString(id));
+        Integer freshStatus = submissionRepository.findStatusById(submissionId);
         if (freshStatus != null && SubmissionResult.isTerminal(freshStatus)) {
             entityManager.refresh(submission);
             log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",

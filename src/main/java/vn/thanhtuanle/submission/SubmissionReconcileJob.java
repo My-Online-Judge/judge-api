@@ -32,6 +32,7 @@ public class SubmissionReconcileJob {
     private final SubmissionRepository submissionRepository;
     private final VerdictPubSub verdictPubSub;
     private final SubmissionMapper submissionMapper;
+    private final SubmissionDetailAssembler detailAssembler;
 
     @Value("${judge.stuck-timeout-min:5}")
     private long stuckTimeoutMin;
@@ -51,7 +52,12 @@ public class SubmissionReconcileJob {
             submission.setErrorMessage(
                     "Judging timed out: no verdict within " + stuckTimeoutMin + " minutes");
             submissionRepository.save(submission);
-            verdictPubSub.publish(submission.getId().toString(), submissionMapper.toDto(submission));
+            // Deferred until this @Transactional method commits (see publishAfterCommit): the
+            // whole loop runs before the commit, so an in-loop publish would race subscribers'
+            // fresh re-reads exactly like the consumer's did. Payload uses the same two-arg
+            // mapper shape as JudgeResultConsumer; details are null for stuck submissions.
+            verdictPubSub.publishAfterCommit(submission.getId().toString(),
+                    submissionMapper.toDto(submission, detailAssembler.assemble(submission)));
             log.warn("Reconciled stuck submission {} -> SYSTEM_ERROR", submission.getId());
         }
         log.info("Reconcile flipped {} stuck submission(s) to SYSTEM_ERROR", stuck.size());
