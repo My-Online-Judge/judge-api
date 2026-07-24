@@ -15,7 +15,7 @@ import vn.thanhtuanle.common.enums.TokenType;
 @EqualsAndHashCode(callSuper = true)
 public class Token extends BaseEntity {
 
-    @Column(unique = true)
+    @Column(unique = true, columnDefinition = "TEXT")
     private String token;
 
     @Enumerated(EnumType.STRING)
