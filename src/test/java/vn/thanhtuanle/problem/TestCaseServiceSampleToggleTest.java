@@ -10,6 +10,7 @@ import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.TestCase;
+import vn.thanhtuanle.problem.dto.TestCaseResponse;
 import vn.thanhtuanle.testcase.TestCaseBundleStore;
 
 import java.util.Optional;
@@ -37,11 +38,12 @@ class TestCaseServiceSampleToggleTest {
                 .problem(problem).build();
         tc.setId(id);
         when(testCaseRepository.findById(id)).thenReturn(Optional.of(tc));
-        when(testCaseRepository.save(tc)).thenReturn(tc);
 
-        service.setSample("a-plus-b", id, true);
+        TestCaseResponse response = service.setSample("a-plus-b", id, true);
 
         assertThat(tc.isSample()).isTrue();
+        assertThat(response.getId()).isEqualTo(id);
+        assertThat(response.isSample()).isTrue();
         // The bundle hash must not change: no re-judge churn from a visibility toggle.
         verifyNoInteractions(bundleStore);
         verifyNoInteractions(infoGenerator);
@@ -58,6 +60,21 @@ class TestCaseServiceSampleToggleTest {
         when(testCaseRepository.findById(id)).thenReturn(Optional.of(tc));
 
         assertThatThrownBy(() -> service.setSample("other-slug", id, true))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(testCaseRepository, never()).save(any());
+        verifyNoInteractions(bundleStore);
+        verifyNoInteractions(infoGenerator);
+    }
+
+    @Test
+    void nullProblem_throwsAndDoesNotSave() {
+        UUID id = UUID.randomUUID();
+        TestCase tc = TestCase.builder().input("a-plus-b/1.in").output("a-plus-b/1.out").build();
+        tc.setId(id);
+        when(testCaseRepository.findById(id)).thenReturn(Optional.of(tc));
+
+        assertThatThrownBy(() -> service.setSample("a-plus-b", id, true))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(testCaseRepository, never()).save(any());

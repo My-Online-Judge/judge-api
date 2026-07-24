@@ -54,13 +54,7 @@ public class TestCaseService {
 
         List<TestCaseResponse> result = new ArrayList<>();
         for (TestCase tc : problem.getTestCases()) {
-            result.add(TestCaseResponse.builder()
-                    .id(tc.getId())
-                    .name(baseNameOf(tc.getInput()))
-                    .input(readContentQuietly(tc.getInput()))
-                    .output(readContentQuietly(tc.getOutput()))
-                    .sample(tc.isSample())
-                    .build());
+            result.add(toResponse(tc));
         }
         result.sort(BY_NUMERIC_NAME);
         log.info("End list test cases for problem: {} (count={})", slug, result.size());
@@ -161,14 +155,7 @@ public class TestCaseService {
     @Transactional
     public void deleteTestCase(String slug, UUID testCaseId) {
         log.info("Start delete test case {} for problem: {}", testCaseId, slug);
-        TestCase tc = testCaseRepository.findById(testCaseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Test case not found: " + testCaseId));
-
-        // Ownership check: the test case must belong to the {slug} problem.
-        if (tc.getProblem() == null || !slug.equals(tc.getProblem().getProblemSlug())) {
-            throw new ResourceNotFoundException(
-                    "Test case " + testCaseId + " not found for problem " + slug);
-        }
+        TestCase tc = getOwnedTestCaseOrThrow(slug, testCaseId);
 
         deleteFileQuietly(tc.getInput());
         deleteFileQuietly(tc.getOutput());
@@ -186,25 +173,12 @@ public class TestCaseService {
     @Transactional
     public TestCaseResponse setSample(String slug, UUID testCaseId, boolean sample) {
         log.info("Start set sample={} for test case {} of problem: {}", sample, testCaseId, slug);
-        TestCase tc = testCaseRepository.findById(testCaseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Test case not found: " + testCaseId));
-
-        // Ownership check: the test case must belong to the {slug} problem.
-        if (tc.getProblem() == null || !slug.equals(tc.getProblem().getProblemSlug())) {
-            throw new ResourceNotFoundException(
-                    "Test case " + testCaseId + " not found for problem " + slug);
-        }
+        TestCase tc = getOwnedTestCaseOrThrow(slug, testCaseId);
 
         tc.setSample(sample);
         testCaseRepository.save(tc);
         log.info("End set sample={} for test case {} of problem: {}", sample, testCaseId, slug);
-        return TestCaseResponse.builder()
-                .id(tc.getId())
-                .name(baseNameOf(tc.getInput()))
-                .input(readContentQuietly(tc.getInput()))
-                .output(readContentQuietly(tc.getOutput()))
-                .sample(tc.isSample())
-                .build();
+        return toResponse(tc);
     }
 
     // --- persistence / IO helpers -------------------------------------------------------------
@@ -229,6 +203,22 @@ public class TestCaseService {
     private Problem getProblemOrThrow(String slug) {
         return problemRepository.findByProblemSlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with slug: " + slug));
+    }
+
+    /**
+     * Looks up a test case by id and verifies it belongs to the {@code slug} problem. Shared by
+     * every mutation that must not act on a test case smuggled in under the wrong problem's slug.
+     */
+    private TestCase getOwnedTestCaseOrThrow(String slug, UUID testCaseId) {
+        TestCase tc = testCaseRepository.findById(testCaseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Test case not found: " + testCaseId));
+
+        // Ownership check: the test case must belong to the {slug} problem.
+        if (tc.getProblem() == null || !slug.equals(tc.getProblem().getProblemSlug())) {
+            throw new ResourceNotFoundException(
+                    "Test case " + testCaseId + " not found for problem " + slug);
+        }
+        return tc;
     }
 
     private int nextIndexFor(Problem problem) {
@@ -260,6 +250,16 @@ public class TestCaseService {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException(field + " file cannot be empty");
         }
+    }
+
+    private TestCaseResponse toResponse(TestCase tc) {
+        return TestCaseResponse.builder()
+                .id(tc.getId())
+                .name(baseNameOf(tc.getInput()))
+                .input(readContentQuietly(tc.getInput()))
+                .output(readContentQuietly(tc.getOutput()))
+                .sample(tc.isSample())
+                .build();
     }
 
     private static TestCaseResponse toResponse(TestCase tc, byte[] inBytes, byte[] outBytes) {
