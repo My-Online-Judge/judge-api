@@ -10,4 +10,10 @@
 -- by ALTER COLUMN ... TYPE text: Postgres does not drop constraints on a type-widening ALTER,
 -- and a btree index entry of ~550 bytes is far under Postgres's ~2704-byte index-entry limit,
 -- so no index change is needed here.
+-- ALTER COLUMN ... TYPE takes ACCESS EXCLUSIVE. With >=2 api instances the old instance is
+-- still writing t_tokens on every login, so without a timeout this statement can queue behind
+-- that traffic while every subsequent query queues behind IT — auth stalls stack-wide and
+-- Flyway hangs the booting instance. Fail fast instead and let the deploy be retried.
+SET lock_timeout = '5s';
+
 ALTER TABLE public.t_tokens ALTER COLUMN token TYPE text;

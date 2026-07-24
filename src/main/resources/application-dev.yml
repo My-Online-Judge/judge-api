@@ -56,9 +56,11 @@ logging:
 application:
   security:
     jwt:
-      # Legacy HS256 fallback. Leave JWT_SECRET_KEY set for <=3 days after the RS256
-      # deploy (old refresh tokens are still live), then remove the env var to end
-      # dual-verify — an empty value disables HS256 verification entirely.
+      # Legacy HS256 fallback. Keep JWT_SECRET_KEY set for AT LEAST as long as the
+      # refresh-token TTL below (old refresh tokens are still live and still HS256).
+      # Only then remove the env var to end dual-verify — an empty value disables HS256
+      # verification entirely. Removing it requires RECREATING the container, not a
+      # restart: env_file is read at container-create time. See .env.example.
       secret-key: ${JWT_SECRET_KEY:}
       rsa:
         private-key: ${JWT_RSA_PRIVATE_KEY}
