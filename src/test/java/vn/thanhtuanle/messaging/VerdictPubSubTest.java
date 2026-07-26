@@ -8,6 +8,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.submission.SubmissionSseRegistry;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
@@ -16,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +60,42 @@ class VerdictPubSubTest {
                 ArgumentCaptor.forClass(SubmissionResponseDto.class);
         verify(sseRegistry).complete(eq("sub-2"), pushed.capture());
         assertThat(pushed.getValue().getStatus()).isEqualTo(SubmissionResult.SYSTEM_ERROR.getValue());
+    }
+
+    @Test
+    void publishAfterCommit_withActiveTransaction_defersUntilAfterCommit() {
+        SubmissionResponseDto dto = SubmissionResponseDto.builder()
+                .status(SubmissionResult.ACCEPTED.getValue()).build();
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            pubSub().publishAfterCommit("sub-4", dto);
+
+            // The transaction has not committed: nothing may reach the wire yet.
+            verify(redisTemplate, never()).convertAndSend(any(), any());
+
+            for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
+                sync.afterCommit();
+            }
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(redisTemplate).convertAndSend(eq(VerdictPubSub.CHANNEL), body.capture());
+        assertThat(body.getValue()).contains("sub-4");
+    }
+
+    @Test
+    void publishAfterCommit_withoutTransaction_publishesImmediately() {
+        SubmissionResponseDto dto = SubmissionResponseDto.builder()
+                .status(SubmissionResult.ACCEPTED.getValue()).build();
+
+        pubSub().publishAfterCommit("sub-5", dto);
+
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(redisTemplate).convertAndSend(eq(VerdictPubSub.CHANNEL), body.capture());
+        assertThat(body.getValue()).contains("sub-5");
     }
 
     @Test

@@ -20,4 +20,5 @@ public class TestCaseResponse {
     private String name;
     private String input;
     private String output;
+    private boolean sample;
 }

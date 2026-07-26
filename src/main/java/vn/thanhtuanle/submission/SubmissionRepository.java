@@ -23,6 +23,19 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
 
     /** Count submissions currently in one of the given statuses — used by the oj.queue.depth gauge. */
     long countByStatusIn(Collection<Integer> statuses);
+
+    /**
+     * Current committed status of a submission, read fresh from the database.
+     *
+     * This MUST stay a scalar projection — do NOT "simplify" it to findById or any
+     * entity-returning query. A JPQL scalar select always hits the database and returns the
+     * committed column value directly, bypassing the persistence context. An entity-returning
+     * query would NOT be fresh: Hibernate merges each query row with the already-managed
+     * instance, so the stale first-level-cache copy wins and the re-read is a no-op.
+     * Returns null when the row no longer exists.
+     */
+    @Query("select s.status from Submission s where s.id = :id")
+    Integer findStatusById(@Param("id") UUID id);
     @Query("SELECT s FROM Submission s WHERE s.problem.problemSlug = :slug ORDER BY s.createdAt DESC")
     Page<Submission> findByProblemSlugOrderByCreatedAtDesc(@Param("slug") String slug, Pageable pageable);
 

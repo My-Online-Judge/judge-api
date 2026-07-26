@@ -7,6 +7,7 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
 import vn.thanhtuanle.metrics.OjMetrics;
+import vn.thanhtuanle.submission.SubmissionDetailAssembler;
 import vn.thanhtuanle.submission.SubmissionRepository;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
@@ -27,6 +28,7 @@ class JudgeResultConsumerMdcTest {
         VerdictPubSub pubSub = mock(VerdictPubSub.class);
         SubmissionMapper mapper = mock(SubmissionMapper.class);
         OjMetrics metrics = mock(OjMetrics.class);
+        SubmissionDetailAssembler detailAssembler = mock(SubmissionDetailAssembler.class);
         UUID id = UUID.randomUUID();
         Submission sub = new Submission();
         sub.setStatus(SubmissionResult.PENDING.getValue());
@@ -35,9 +37,9 @@ class JudgeResultConsumerMdcTest {
 
         AtomicReference<String> mdcDuring = new AtomicReference<>();
         doAnswer(inv -> { mdcDuring.set(MDC.get("submissionId")); return null; })
-                .when(pubSub).publish(any(), any());
+                .when(pubSub).publishAfterCommit(any(), any());
 
-        JudgeResultConsumer consumer = new JudgeResultConsumer(repo, pubSub, mapper, metrics);
+        JudgeResultConsumer consumer = new JudgeResultConsumer(repo, pubSub, mapper, metrics, detailAssembler);
         SubmissionJudgedEvent event = new SubmissionJudgedEvent();
         event.setSubmissionId(id.toString());
         event.setStatus(SubmissionResult.ACCEPTED.getValue());

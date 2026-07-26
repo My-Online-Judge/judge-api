@@ -26,6 +26,9 @@ public class TestCase extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String output;
 
+    @Column(name = "is_sample", nullable = false)
+    private boolean sample;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "problem_id")
     private Problem problem;

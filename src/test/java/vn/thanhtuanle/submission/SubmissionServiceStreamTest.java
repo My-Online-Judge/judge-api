@@ -1,5 +1,6 @@
 package vn.thanhtuanle.submission;
 
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -10,7 +11,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import vn.thanhtuanle.common.enums.SubmissionResult;
+import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.entity.Submission;
+import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
 import vn.thanhtuanle.problem.ProblemRepository;
@@ -22,7 +25,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,43 +41,61 @@ class SubmissionServiceStreamTest {
     @Mock UserService userService;
     @Mock ApplicationEventPublisher applicationEventPublisher;
     @Mock SubmissionSseRegistry sseRegistry;
+    @Mock SubmissionDetailAssembler detailAssembler;
+    @Mock EntityManager entityManager;
 
     @InjectMocks SubmissionService submissionService;
 
     @Test
-    void streamVerdict_registersEmitterBeforeReadingDb_andReplaysTerminalVerdict() {
+    void streamVerdict_loadsAndAuthorizesBeforeSubscribing_thenReplaysTerminalVerdict() {
         UUID id = UUID.randomUUID();
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
         Submission s = new Submission();
         s.setId(id);
+        s.setUser(owner);
         s.setStatus(SubmissionResult.ACCEPTED.getValue());
         SubmissionResponseDto dto = SubmissionResponseDto.builder()
                 .status(SubmissionResult.ACCEPTED.getValue()).build();
         SseEmitter emitter = new SseEmitter();
-        when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
-        when(submissionMapper.toDto(s)).thenReturn(dto);
+        when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.ACCEPTED.getValue());
+        when(userService.getCurrentUser()).thenReturn(owner);
+        when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
+        when(submissionMapper.toDto(eq(s), any())).thenReturn(dto);
 
         SseEmitter result = submissionService.streamVerdict(id.toString());
 
         assertThat(result).isSameAs(emitter);
-        // Ordering is the race-safety property: subscribe MUST happen before the DB read.
-        InOrder inOrder = inOrder(sseRegistry, submissionRepository);
-        inOrder.verify(sseRegistry).subscribe(id.toString());
+        // Ordering is the security property: load + authorize MUST happen before subscribe,
+        // so a denied/unknown request never registers (and evicts) an emitter.
+        InOrder inOrder = inOrder(submissionRepository, sseRegistry);
         inOrder.verify(submissionRepository).findById(id);
+        inOrder.verify(sseRegistry).subscribe(id.toString());
+        // The replay decision must come from the post-subscribe scalar re-read, and the
+        // replayed entity must be refreshed from the database before mapping.
+        inOrder.verify(submissionRepository).findStatusById(id);
+        verify(entityManager).refresh(s);
         verify(sseRegistry).complete(id.toString(), dto);
     }
 
     @Test
     void streamVerdict_whenPending_doesNotReplay() {
         UUID id = UUID.randomUUID();
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
         Submission s = new Submission();
         s.setId(id);
+        s.setUser(owner);
         s.setStatus(SubmissionResult.PENDING.getValue());
-        when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+        when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.PENDING.getValue());
+        when(userService.getCurrentUser()).thenReturn(owner);
+        when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
 
         submissionService.streamVerdict(id.toString());
 
+        verify(entityManager, never()).refresh(any());
         verify(sseRegistry, never()).complete(any(), any());
         verify(submissionMapper, never()).toDto(any(Submission.class));
     }
@@ -80,28 +103,98 @@ class SubmissionServiceStreamTest {
     @Test
     void streamVerdict_whenJudging_doesNotReplay() {
         UUID id = UUID.randomUUID();
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
         Submission s = new Submission();
         s.setId(id);
+        s.setUser(owner);
         s.setStatus(SubmissionResult.JUDGING.getValue());
-        when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+        when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.JUDGING.getValue());
+        when(userService.getCurrentUser()).thenReturn(owner);
+        when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
 
         submissionService.streamVerdict(id.toString());
 
+        verify(entityManager, never()).refresh(any());
         verify(sseRegistry, never()).complete(any(), any());
         verify(submissionMapper, never()).toDto(any(Submission.class));
     }
 
     @Test
-    void streamVerdict_whenNotFound_completesEmitterWithoutVerdict() {
+    void streamVerdict_verdictArrivesBetweenLoadAndSubscribe_replaysFromFreshScalarRead() {
+        // Pins the missed-verdict race the way production JPA actually behaves: within one
+        // persistence context a second findById returns the SAME managed (stale) instance —
+        // it is a no-op, not a fresh read. So the terminal replay decision must come from a
+        // scalar status query (always hits the DB), and the entity must then be refresh()ed
+        // before mapping the replay payload.
         UUID id = UUID.randomUUID();
-        SseEmitter emitter = mock(SseEmitter.class);
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
+
+        // The one managed instance: PENDING when loaded for authorization, and — exactly like
+        // the L1 cache — still PENDING if findById were asked again.
+        Submission managed = new Submission();
+        managed.setId(id);
+        managed.setUser(owner);
+        managed.setStatus(SubmissionResult.PENDING.getValue());
+
+        SubmissionResponseDto dto = SubmissionResponseDto.builder()
+                .status(SubmissionResult.ACCEPTED.getValue()).build();
+        SseEmitter emitter = new SseEmitter();
+
+        when(submissionRepository.findById(id)).thenReturn(Optional.of(managed));
+        // The verdict "landed" between load and subscribe: the committed row is terminal.
+        when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.ACCEPTED.getValue());
+        // refresh() re-reads the row into the managed instance, like real EntityManager.refresh.
+        doAnswer(inv -> {
+            managed.setStatus(SubmissionResult.ACCEPTED.getValue());
+            return null;
+        }).when(entityManager).refresh(managed);
+        when(userService.getCurrentUser()).thenReturn(owner);
         when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
-        when(submissionRepository.findById(id)).thenReturn(Optional.empty());
+        when(submissionMapper.toDto(eq(managed), any())).thenReturn(dto);
 
         submissionService.streamVerdict(id.toString());
 
-        verify(emitter).complete();
+        verify(entityManager).refresh(managed);
+        verify(sseRegistry).complete(id.toString(), dto);
+        assertThat(managed.getStatus()).isEqualTo(SubmissionResult.ACCEPTED.getValue());
+    }
+
+    @Test
+    void streamVerdict_whenRowGoneAtScalarReRead_doesNotReplay() {
+        // Row deleted between load and re-read: null scalar means no replay decision can be
+        // made — leave the emitter to the registry timeout, no special-casing.
+        UUID id = UUID.randomUUID();
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
+        Submission s = new Submission();
+        s.setId(id);
+        s.setUser(owner);
+        s.setStatus(SubmissionResult.PENDING.getValue());
+        when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
+        when(submissionRepository.findStatusById(id)).thenReturn(null);
+        when(userService.getCurrentUser()).thenReturn(owner);
+        when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
+
+        submissionService.streamVerdict(id.toString());
+
+        verify(entityManager, never()).refresh(any());
         verify(sseRegistry, never()).complete(any(), any());
+    }
+
+    @Test
+    void streamVerdict_whenNotFound_throwsResourceNotFound() {
+        // Behavior change (approved): unknown id used to complete an already-registered
+        // emitter with no verdict (200-empty). It now 404s before ever subscribing, so an
+        // unknown id is indistinguishable from a denied id (closes the id-existence oracle).
+        UUID id = UUID.randomUUID();
+        when(submissionRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> submissionService.streamVerdict(id.toString()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(sseRegistry);
     }
 }
