@@ -1,4 +1,4 @@
--- V11: t_submissions.error_message was varchar(255) in the V1 baseline (captured from a
+-- V14: t_submissions.error_message was varchar(255) in the V1 baseline (captured from a
 -- pg_dump of the pre-Flyway schema), but the entity declares @Column(columnDefinition = "TEXT").
 -- ddl-auto=validate does not catch the drift (Hibernate checks Java-type compatibility, not
 -- length), so any verdict whose message exceeded 255 chars — a real gcc dump easily does —
