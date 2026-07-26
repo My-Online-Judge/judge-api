@@ -28,6 +28,11 @@ public class OjMetrics {
         Gauge.builder("oj.queue.depth", submissionRepository, r -> queueDepth(r))
                 .description("Submissions pending or in judging")
                 .register(registry);
+        // oj.verdict{status=...} counters are created lazily by recordVerdict on the first verdict of
+        // each status. Pre-creating them at 0 here was tried and dropped: in this stack an idle zero
+        // counter is dropped from the live scrape anyway, so the pre-registration bought nothing. The
+        // alerts in alerts.yml are written absent-safe (`... or vector(0)`) so a status whose series
+        // does not exist yet reads as 0, not no-data. See the ops memory for the investigation.
     }
 
     /** Record one terminal verdict. Never throws — must not break the verdict transaction. */
