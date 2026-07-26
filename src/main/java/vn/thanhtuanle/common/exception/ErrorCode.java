@@ -27,6 +27,13 @@ public enum ErrorCode {
     PASSWORD_INVALID("Password must be at least 8 characters and include letters and digits", HttpStatus.BAD_REQUEST),
     EMAIL_INVALID("Email is not valid", HttpStatus.BAD_REQUEST),
     USER_STATUS_INVALID("Status must be ACTIVE or DISABLED", HttpStatus.BAD_REQUEST),
+    RATE_LIMITED("Too many failed login attempts. Try again later", HttpStatus.TOO_MANY_REQUESTS),
+    ACCESS_BANNED("Access from this address or device is banned", HttpStatus.FORBIDDEN),
+    BAN_EXISTED("This value is already banned", HttpStatus.CONFLICT),
+    BAN_SELF("You cannot ban your own current IP or device", HttpStatus.CONFLICT),
+    BAN_INVALID("Ban type must be IP or DEVICE and value must not be blank", HttpStatus.BAD_REQUEST),
+    BAN_NOT_FOUND("Ban not found", HttpStatus.NOT_FOUND),
+    SUBMISSION_RATE_LIMITED("You are submitting too fast. Try again in a moment", HttpStatus.TOO_MANY_REQUESTS),
     UNCATEGORIZED_EXCEPTION("Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final String message;

@@ -16,6 +16,7 @@ public class Routes {
     public static final String PERMISSIONS = BASE_API + "/permissions";
     public static final String ROLES = BASE_API + "/roles";
     public static final String USERS = BASE_API + "/users";
+    public static final String SECURITY = BASE_API + "/security";
 
     // Fixed path expected by the QingdaoU judge_server (its BACKEND_URL), outside the /api/v1 group.
     public static final String JUDGE_SERVER_HEARTBEAT = "/api/judge_server_heartbeat";

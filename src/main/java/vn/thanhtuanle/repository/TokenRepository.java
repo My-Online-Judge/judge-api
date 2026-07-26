@@ -2,6 +2,7 @@ package vn.thanhtuanle.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import vn.thanhtuanle.common.enums.TokenType;
 import vn.thanhtuanle.entity.Token;
 
 import java.util.List;
@@ -19,4 +20,6 @@ public interface TokenRepository extends JpaRepository<Token, UUID> {
     Optional<Token> findByToken(String token);
 
     void deleteAllByUserId(UUID userId);
+
+    void deleteAllByUserIdAndTokenType(UUID userId, TokenType tokenType);
 }
