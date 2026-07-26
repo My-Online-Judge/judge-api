@@ -48,7 +48,11 @@ jobs:
           cat .env | grep -v '^#' >> $GITHUB_ENV
 
       - name: Build and Test with Maven
-        run: mvn clean verify
+        # Deactivating the Testcontainers execution condition turns "Docker unavailable on
+        # the runner" into a hard test failure instead of a silent skip — the schema-drift
+        # regression guard (SubmissionErrorMessageColumnTest) must actually run in CI.
+        # Locally the condition stays active, so devs without Docker still get a clean skip.
+        run: mvn clean verify '-Djunit.jupiter.conditions.deactivate=org.testcontainers.*'
 
   build-and-push:
     needs: test-and-lint
