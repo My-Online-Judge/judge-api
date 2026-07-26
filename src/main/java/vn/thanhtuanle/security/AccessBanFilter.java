@@ -35,8 +35,8 @@ public class AccessBanFilter extends OncePerRequestFilter {
     public AccessBanFilter(AccessBanMirror mirror, ObjectMapper objectMapper, MeterRegistry registry) {
         this.mirror = mirror;
         this.objectMapper = objectMapper;
-        // Eager registration so the series exists at 0 from boot — see SubmissionRateLimiter for why
-        // a lazily-created counter makes its alert unfireable.
+        // Held for cheap increments; not a guarantee of an always-visible zero series (see the note
+        // in SubmissionRateLimiter — alerts are absent-safe rather than relying on pre-registration).
         this.banned = Counter.builder("oj.request.banned")
                 .description("Requests refused because their ip or device is banned")
                 .register(registry);

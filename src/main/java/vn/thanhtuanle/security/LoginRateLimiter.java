@@ -39,8 +39,8 @@ public class LoginRateLimiter {
 
     public LoginRateLimiter(StringRedisTemplate redis, MeterRegistry registry) {
         this.redis = redis;
-        // Eager registration so the series exists at 0 from boot — see SubmissionRateLimiter for why
-        // a lazily-created counter makes its alert unfireable.
+        // Held for cheap increments; not a guarantee of an always-visible zero series (see the note
+        // in SubmissionRateLimiter — alerts are absent-safe rather than relying on pre-registration).
         this.throttled = Counter.builder("oj.login.rate_limited")
                 .description("Login attempts rejected while a lockout was in force")
                 .register(registry);

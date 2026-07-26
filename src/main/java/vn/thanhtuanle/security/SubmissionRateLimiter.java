@@ -31,9 +31,12 @@ public class SubmissionRateLimiter {
     public SubmissionRateLimiter(StringRedisTemplate redis, MeterRegistry registry,
                                  @Value("${oj.submission.cooldown-seconds:10}") long cooldownSeconds) {
         this.redis = redis;
-        // Registered at startup, not on first throttle: a lazily-created counter is absent from
-        // /actuator/prometheus until it first increments, and Prometheus cannot tell "never happened"
-        // from "not exposed" — any alert on it would sit in no-data instead of firing.
+        // Hold the Counter rather than looking it up by name on every throttle — the idiomatic
+        // Micrometer pattern. NOTE: registering it here does NOT guarantee an always-visible zero
+        // series. In this stack (Spring Boot 3.4 / Micrometer 1.14 / prometheus-metrics-core) an idle
+        // counter that stays at 0 is dropped from the live scrape and only reappears once it
+        // increments — so alerts on oj_* counters are written absent-safe in alerts.yml instead of
+        // relying on a zero series being present. See the ops memory for the full investigation.
         this.throttled = Counter.builder("oj.submission.rate_limited")
                 .description("Submissions rejected by the per-user cooldown")
                 .register(registry);

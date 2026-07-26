@@ -28,16 +28,11 @@ public class OjMetrics {
         Gauge.builder("oj.queue.depth", submissionRepository, r -> queueDepth(r))
                 .description("Submissions pending or in judging")
                 .register(registry);
-        // Pre-create one series per terminal verdict so each exists at 0 from boot. A tagged counter
-        // is created on first increment, so before the first SYSTEM_ERROR ever happens there is no
-        // oj_verdict_total{status="SYSTEM_ERROR"} series at all — and an alert on a series that does
-        // not exist evaluates to no-data, never to "fine". PENDING/JUDGING are excluded: they are
-        // queue states that recordVerdict never sees.
-        for (SubmissionResult result : SubmissionResult.values()) {
-            if (SubmissionResult.isTerminal(result.getValue())) {
-                registry.counter("oj.verdict", "status", result.name());
-            }
-        }
+        // oj.verdict{status=...} counters are created lazily by recordVerdict on the first verdict of
+        // each status. Pre-creating them at 0 here was tried and dropped: in this stack an idle zero
+        // counter is dropped from the live scrape anyway, so the pre-registration bought nothing. The
+        // alerts in alerts.yml are written absent-safe (`... or vector(0)`) so a status whose series
+        // does not exist yet reads as 0, not no-data. See the ops memory for the investigation.
     }
 
     /** Record one terminal verdict. Never throws — must not break the verdict transaction. */
