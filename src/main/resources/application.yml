@@ -44,7 +44,21 @@ management:
   endpoints:
     web:
       exposure:
-        include: '*'
+        # Explicit allowlist, NOT '*'. Exposing every endpoint let any authenticated user —
+        # including an ordinary contestant, since SecurityConfig gates non-scrape actuator
+        # endpoints only with .anyRequest().authenticated() — reach /actuator/heapdump and
+        # extract the JWT RSA private key from the dump. Only these four are needed: prometheus
+        # (scrape), metrics + health (ops), info. Everything else (env, beans, configprops,
+        # loggers, heapdump, threaddump, …) is now unmapped → 404 for everyone, admins included.
+        include: health,info,prometheus,metrics
+  endpoint:
+    # Defense in depth: even if the allowlist above is ever widened again, the two endpoints
+    # that leak the most (a full heap dump / every thread's stack) stay off. 'access: none' is
+    # the Spring Boot 3.4 replacement for the deprecated per-endpoint 'enabled' flag.
+    heapdump:
+      access: none
+    threaddump:
+      access: none
 
 logging:
   level:
