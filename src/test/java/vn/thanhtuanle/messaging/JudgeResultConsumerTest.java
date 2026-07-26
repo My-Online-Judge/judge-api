@@ -10,6 +10,7 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
 import vn.thanhtuanle.metrics.OjMetrics;
+import vn.thanhtuanle.submission.SubmissionDetailAssembler;
 import vn.thanhtuanle.submission.SubmissionRepository;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
@@ -28,6 +29,7 @@ class JudgeResultConsumerTest {
     @Mock VerdictPubSub verdictPubSub;
     @Mock SubmissionMapper submissionMapper;
     @Mock OjMetrics ojMetrics;
+    @Mock SubmissionDetailAssembler detailAssembler;
     @InjectMocks JudgeResultConsumer consumer;
 
     private Submission pending(UUID id) {
@@ -46,7 +48,7 @@ class JudgeResultConsumerTest {
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         SubmissionResponseDto dto = SubmissionResponseDto.builder()
                 .status(SubmissionResult.ACCEPTED.getValue()).build();
-        when(submissionMapper.toDto(s)).thenReturn(dto);
+        when(submissionMapper.toDto(eq(s), any())).thenReturn(dto);
 
         SubmissionJudgedEvent e = SubmissionJudgedEvent.builder()
                 .submissionId(id.toString()).status(SubmissionResult.ACCEPTED.getValue())
@@ -59,7 +61,9 @@ class JudgeResultConsumerTest {
         assertThat(s.getTime()).isEqualTo(15);
         assertThat(s.getMemory()).isEqualTo(3072L);
         verify(submissionRepository).save(s);
-        verify(verdictPubSub).publish(id.toString(), dto);
+        // Routed through the after-commit entry point; with no active transaction it
+        // degenerates to an immediate publish (see VerdictPubSubTest).
+        verify(verdictPubSub).publishAfterCommit(id.toString(), dto);
     }
 
     @Test
@@ -75,7 +79,7 @@ class JudgeResultConsumerTest {
 
         assertThat(s.getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
         verify(submissionRepository, never()).save(any());
-        verify(verdictPubSub, never()).publish(any(), any());
+        verify(verdictPubSub, never()).publishAfterCommit(any(), any());
     }
 
     @Test
@@ -92,6 +96,6 @@ class JudgeResultConsumerTest {
 
         assertThat(s.getStatus()).isEqualTo(SubmissionResult.ACCEPTED.getValue());
         verify(submissionRepository, never()).save(any());
-        verify(verdictPubSub, never()).publish(any(), any());
+        verify(verdictPubSub, never()).publishAfterCommit(any(), any());
     }
 }

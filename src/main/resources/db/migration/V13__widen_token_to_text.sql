@@ -1,4 +1,4 @@
--- V12: widen t_tokens.token from varchar(255) to text.
+-- V13: widen t_tokens.token from varchar(255) to text.
 --
 -- JPA's default column length (255) was enough for the old HS256 access tokens (~229 chars,
 -- 26 chars of headroom) but not for RS256: an RSA-2048 signature is 256 bytes -> 342 base64

@@ -12,6 +12,7 @@ import vn.thanhtuanle.common.util.FileUtil;
 import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.TestCase;
+import vn.thanhtuanle.problem.dto.TestCaseContext;
 import vn.thanhtuanle.problem.dto.TestCaseResponse;
 
 import java.io.IOException;
@@ -53,16 +54,29 @@ public class TestCaseService {
 
         List<TestCaseResponse> result = new ArrayList<>();
         for (TestCase tc : problem.getTestCases()) {
-            result.add(TestCaseResponse.builder()
-                    .id(tc.getId())
-                    .name(baseNameOf(tc.getInput()))
-                    .input(readContentQuietly(tc.getInput()))
-                    .output(readContentQuietly(tc.getOutput()))
-                    .build());
+            result.add(toResponse(tc));
         }
         result.sort(BY_NUMERIC_NAME);
         log.info("End list test cases for problem: {} (count={})", slug, result.size());
         return result;
+    }
+
+    /**
+     * Numeric base name ("1", "2") -> visibility + contents, for correlating judge results back
+     * to test cases. The judge reports {@code test_case} as the file stem, not a UUID, so this
+     * is the only available join key.
+     */
+    public Map<String, TestCaseContext> contextByName(Problem problem) {
+        Map<String, TestCaseContext> byName = new HashMap<>();
+        for (TestCase tc : problem.getTestCases()) {
+            String name = baseNameOf(tc.getInput());
+            byName.put(name, tc.isSample()
+                    ? new TestCaseContext(true,
+                            readContentQuietly(tc.getInput()),
+                            readContentQuietly(tc.getOutput()))
+                    : TestCaseContext.hidden());
+        }
+        return byName;
     }
 
     @Transactional
@@ -141,14 +155,7 @@ public class TestCaseService {
     @Transactional
     public void deleteTestCase(String slug, UUID testCaseId) {
         log.info("Start delete test case {} for problem: {}", testCaseId, slug);
-        TestCase tc = testCaseRepository.findById(testCaseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Test case not found: " + testCaseId));
-
-        // Ownership check: the test case must belong to the {slug} problem.
-        if (tc.getProblem() == null || !slug.equals(tc.getProblem().getProblemSlug())) {
-            throw new ResourceNotFoundException(
-                    "Test case " + testCaseId + " not found for problem " + slug);
-        }
+        TestCase tc = getOwnedTestCaseOrThrow(slug, testCaseId);
 
         deleteFileQuietly(tc.getInput());
         deleteFileQuietly(tc.getOutput());
@@ -156,6 +163,22 @@ public class TestCaseService {
         infoGenerator.generateInfo(slug);
         bundleStore.publish(slug);
         log.info("End delete test case {} for problem: {}", testCaseId, slug);
+    }
+
+    /**
+     * Toggle whether a test case's input/output may be shown to users. Deliberately does NOT
+     * regenerate the info file or republish the bundle — visibility is database-only metadata,
+     * and changing the bundle hash would force a needless re-judge.
+     */
+    @Transactional
+    public TestCaseResponse setSample(String slug, UUID testCaseId, boolean sample) {
+        log.info("Start set sample={} for test case {} of problem: {}", sample, testCaseId, slug);
+        TestCase tc = getOwnedTestCaseOrThrow(slug, testCaseId);
+
+        tc.setSample(sample);
+        testCaseRepository.save(tc);
+        log.info("End set sample={} for test case {} of problem: {}", sample, testCaseId, slug);
+        return toResponse(tc);
     }
 
     // --- persistence / IO helpers -------------------------------------------------------------
@@ -180,6 +203,22 @@ public class TestCaseService {
     private Problem getProblemOrThrow(String slug) {
         return problemRepository.findByProblemSlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with slug: " + slug));
+    }
+
+    /**
+     * Looks up a test case by id and verifies it belongs to the {@code slug} problem. Shared by
+     * every mutation that must not act on a test case smuggled in under the wrong problem's slug.
+     */
+    private TestCase getOwnedTestCaseOrThrow(String slug, UUID testCaseId) {
+        TestCase tc = testCaseRepository.findById(testCaseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Test case not found: " + testCaseId));
+
+        // Ownership check: the test case must belong to the {slug} problem.
+        if (tc.getProblem() == null || !slug.equals(tc.getProblem().getProblemSlug())) {
+            throw new ResourceNotFoundException(
+                    "Test case " + testCaseId + " not found for problem " + slug);
+        }
+        return tc;
     }
 
     private int nextIndexFor(Problem problem) {
@@ -213,12 +252,23 @@ public class TestCaseService {
         }
     }
 
+    private TestCaseResponse toResponse(TestCase tc) {
+        return TestCaseResponse.builder()
+                .id(tc.getId())
+                .name(baseNameOf(tc.getInput()))
+                .input(readContentQuietly(tc.getInput()))
+                .output(readContentQuietly(tc.getOutput()))
+                .sample(tc.isSample())
+                .build();
+    }
+
     private static TestCaseResponse toResponse(TestCase tc, byte[] inBytes, byte[] outBytes) {
         return TestCaseResponse.builder()
                 .id(tc.getId())
                 .name(baseNameOf(tc.getInput()))
                 .input(new String(inBytes, StandardCharsets.UTF_8))
                 .output(new String(outBytes, StandardCharsets.UTF_8))
+                .sample(tc.isSample())
                 .build();
     }
 

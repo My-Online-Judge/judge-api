@@ -7,8 +7,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import vn.thanhtuanle.judge.dto.JudgeResultDto;
 
 import lombok.experimental.SuperBuilder;
+
+import java.util.List;
 
 @Entity
 @Table(name = "t_submissions")
@@ -48,4 +53,11 @@ public class Submission extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
     private User user;
+
+    // Raw per-testcase results from the judge, stored verbatim. Read ONLY through
+    // SubmissionDetailAssembler — it carries hidden test data that must be filtered.
+    // No columnDefinition: the test profile is H2, which has no `jsonb`.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "details")
+    private List<JudgeResultDto> details;
 }

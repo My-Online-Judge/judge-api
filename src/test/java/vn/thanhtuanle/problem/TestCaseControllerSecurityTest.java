@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -21,6 +22,7 @@ import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = TestCaseController.class)
@@ -72,6 +74,24 @@ class TestCaseControllerSecurityTest {
     @WithMockUser(authorities = "role:read")
     void deleteForbidden_whenUserHasWrongPermission() throws Exception {
         mockMvc.perform(delete(BASE + "/" + UUID.randomUUID()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = "problem:update")
+    void patchAllowed_whenUserHasProblemUpdatePermission() throws Exception {
+        mockMvc.perform(patch(BASE + "/" + UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sample\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(authorities = "role:read")
+    void patchForbidden_whenUserHasWrongPermission() throws Exception {
+        mockMvc.perform(patch(BASE + "/" + UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sample\":true}"))
                 .andExpect(status().isForbidden());
     }
 }

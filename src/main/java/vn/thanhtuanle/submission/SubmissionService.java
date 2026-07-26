@@ -1,5 +1,6 @@
 package vn.thanhtuanle.submission;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -8,9 +9,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import vn.thanhtuanle.common.constant.Permissions;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.common.payload.PageResponse;
@@ -45,6 +48,9 @@ public class SubmissionService {
     private final UserService userService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final SubmissionSseRegistry sseRegistry;
+    private final SubmissionDetailAssembler detailAssembler;
+    // Shared transactional EntityManager proxy — used only for refresh() in streamVerdict.
+    private final EntityManager entityManager;
     private final SubmissionRateLimiter submissionRateLimiter;
 
     @Transactional
@@ -109,32 +115,54 @@ public class SubmissionService {
         log.info("Service to get submission by id: {}", id);
         Submission submission = submissionRepository.findById(UUID.fromString(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + id));
-        return submissionMapper.toDto(submission);
+        assertCanRead(submission, id);
+        return submissionMapper.toDto(submission, detailAssembler.assemble(submission));
     }
 
     @Transactional(readOnly = true)
     public SseEmitter streamVerdict(String id) {
-        // Register the emitter FIRST: if the verdict fires between here and the DB
-        // read, the consumer still finds this emitter. Then, if the submission is
-        // already terminal, replay the verdict now so a late subscriber isn't lost.
+        // Load + authorize BEFORE subscribing: an unknown id must 404 identically to a denied
+        // id (no existence oracle), and no emitter may ever be registered for a request that
+        // fails either check (registering first would let a denied/unknown request evict a
+        // legitimate owner's live emitter — an eviction DoS). This first read ONLY authorizes;
+        // it is never the basis for the replay decision.
+        UUID submissionId = UUID.fromString(id);
+        Submission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Submission not found with id: " + id));
+        assertCanRead(submission, id);
+
+        // Now that the caller is authorized, register the emitter. The verdict may have landed
+        // in the window between the read above and subscribe(): if the consumer's publish ran
+        // before the emitter existed, the replay decision must come from a GENUINELY fresh
+        // read. A second findById would not be one — within this persistence context it returns
+        // the already-managed (stale) instance without touching the database. The scalar status
+        // query below always hits the database (see the warning on findStatusById), so it sees
+        // the committed verdict; refresh() then forces a DB re-read into the managed instance
+        // so the replay payload matches. Together with writers publishing only AFTER their
+        // commit (VerdictPubSub.publishAfterCommit), this closes the race completely: a
+        // subscriber either registers before the post-commit publish (receives it live) or
+        // re-reads after the commit (sees terminal here and replays).
         SseEmitter emitter = sseRegistry.subscribe(id);
-        Submission submission = submissionRepository.findById(UUID.fromString(id)).orElse(null);
-        if (submission == null) {
-            log.info("SSE subscribe for unknown submission {}, completing", id);
-            emitter.complete();
-            return emitter;
-        }
-        if (SubmissionResult.isTerminal(submission.getStatus())) {
+        Integer freshStatus = submissionRepository.findStatusById(submissionId);
+        if (freshStatus != null && SubmissionResult.isTerminal(freshStatus)) {
+            entityManager.refresh(submission);
             log.info("Submission {} already terminal (status={}) at subscribe, replaying verdict",
                     id, submission.getStatus());
-            sseRegistry.complete(id, submissionMapper.toDto(submission));
+            sseRegistry.complete(id, submissionMapper.toDto(submission, detailAssembler.assemble(submission)));
         }
+        // Null (row gone) or non-terminal: no replay — the live post-commit publish or the
+        // registry timeout takes it from here.
         return emitter;
     }
 
     @Transactional(readOnly = true)
     public PageResponse<SubmissionResponseDto> getSubmissionsByUser(String userId, int page, int size) {
         log.info("Service to get submissions by user_id: {}", userId);
+
+        UUID requested = UUID.fromString(userId);
+        if (!requested.equals(userService.getCurrentUser().getId()) && !hasReadAnyAuthority()) {
+            throw new ResourceNotFoundException("Submissions not found for user: " + userId);
+        }
 
         Pageable pageable = PageRequest.of(page, size);
 
@@ -150,6 +178,11 @@ public class SubmissionService {
             int page, int size) {
         log.info("Service to get submissions by user_id: {} and problem_slug: {}", userId, problemSlug);
 
+        UUID requested = UUID.fromString(userId);
+        if (!requested.equals(userService.getCurrentUser().getId()) && !hasReadAnyAuthority()) {
+            throw new ResourceNotFoundException("Submissions not found for user: " + userId);
+        }
+
         Pageable pageable = PageRequest.of(page, size);
 
         Page<Submission> submissionPage = submissionRepository
@@ -158,5 +191,26 @@ public class SubmissionService {
         log.info("Found {} submissions for user_id: {} and problem_slug: {}", submissionPage.getTotalElements(), userId,
                 problemSlug);
         return PageResponse.of(submissionPage.map(submissionMapper::toDto));
+    }
+
+    /**
+     * Owner-or-admin gate. Throws {@link ResourceNotFoundException} — deliberately a 404 rather
+     * than a 403, so the response does not confirm that an id exists.
+     */
+    private void assertCanRead(Submission submission, String id) {
+        User current = userService.getCurrentUser();
+        boolean isOwner = submission.getUser() != null
+                && submission.getUser().getId().equals(current.getId());
+        if (isOwner || hasReadAnyAuthority()) {
+            return;
+        }
+        log.warn("User {} denied access to submission {}", current.getId(), id);
+        throw new ResourceNotFoundException("Submission not found with id: " + id);
+    }
+
+    private boolean hasReadAnyAuthority() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> Permissions.SUBMISSION_READ_ANY.equals(a.getAuthority()));
     }
 }
