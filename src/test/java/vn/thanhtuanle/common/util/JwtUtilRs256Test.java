@@ -6,6 +6,8 @@ import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Set;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -14,18 +16,20 @@ import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import vn.thanhtuanle.entity.Permission;
+import vn.thanhtuanle.entity.Role;
 import vn.thanhtuanle.entity.User;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * T4-9b: all new tokens are RS256 (+kid); verification accepts RS256 always and
- * HS256 only while the legacy secret is still configured (time-boxed dual-verify).
+ * All tokens are RS256 (+kid). T4-9b's time-boxed HS256 dual-verify was retired in sub-project 1:
+ * a token declaring any other algorithm is refused.
  */
 class JwtUtilRs256Test {
 
-    // A fixed legacy HS256 secret (base64 of 64 random bytes), matching the old format.
+    // An HS256 secret in the old format (base64 of 64 bytes): what a pre-RS256 token was signed with.
     private static final String LEGACY_SECRET =
             Base64.getEncoder().encodeToString(
                     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8));
@@ -57,11 +61,10 @@ class JwtUtilRs256Test {
                 .encodeToString(pem.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static JwtUtil newJwtUtil(KeyPair pair, String legacySecret) {
+    private static JwtUtil newJwtUtil(KeyPair pair) {
         JwtUtil util = new JwtUtil();
         ReflectionTestUtils.setField(util, "rsaPrivateKeyPem", pemBase64("PRIVATE KEY", pair.getPrivate().getEncoded()));
         ReflectionTestUtils.setField(util, "rsaPublicKeyPem", pemBase64("PUBLIC KEY", pair.getPublic().getEncoded()));
-        ReflectionTestUtils.setField(util, "secretKey", legacySecret == null ? "" : legacySecret);
         ReflectionTestUtils.setField(util, "jwtExpiration", 900000L);
         ReflectionTestUtils.setField(util, "refreshExpiration", 259200000L);
         util.init();
@@ -69,7 +72,9 @@ class JwtUtilRs256Test {
     }
 
     private static User alice() {
-        return User.builder().username("alice@example.com").build();
+        User alice = User.builder().username("alice@example.com").build();
+        alice.setId(java.util.UUID.fromString("11111111-2222-3333-4444-555555555555"));
+        return alice;
     }
 
     /** Decode the JWS header (first dot-segment) as a UTF-8 JSON string. */
@@ -79,7 +84,7 @@ class JwtUtilRs256Test {
 
     @Test
     void rs256TokenRoundTrips() throws Exception {
-        JwtUtil util = newJwtUtil(rsaPair(), null);
+        JwtUtil util = newJwtUtil(rsaPair());
         String token = util.generateToken(alice());
         assertThat(util.extractUsername(token)).isEqualTo("alice@example.com");
         assertThat(util.extractJti(token)).isNotBlank();
@@ -88,7 +93,7 @@ class JwtUtilRs256Test {
     @Test
     void newTokensCarryRs256AndKidHeader() throws Exception {
         KeyPair pair = rsaPair();
-        JwtUtil util = newJwtUtil(pair, null);
+        JwtUtil util = newJwtUtil(pair);
         String header = headerJson(util.generateToken(alice()));
 
         byte[] digest = MessageDigest.getInstance("SHA-256").digest(pair.getPublic().getEncoded());
@@ -101,24 +106,14 @@ class JwtUtilRs256Test {
 
     @Test
     void refreshTokensAreAlsoRs256() throws Exception {
-        JwtUtil util = newJwtUtil(rsaPair(), null);
+        JwtUtil util = newJwtUtil(rsaPair());
         assertThat(headerJson(util.generateRefreshToken(alice()))).contains("\"alg\":\"RS256\"");
     }
 
-    @Test
-    void legacyHs256TokenVerifies_whileSecretConfigured() throws Exception {
-        JwtUtil util = newJwtUtil(rsaPair(), LEGACY_SECRET);
-        String legacyToken = Jwts.builder()
-                .setSubject("alice@example.com")
-                .setExpiration(new java.util.Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(Base64.getDecoder().decode(LEGACY_SECRET)), SignatureAlgorithm.HS256)
-                .compact();
-        assertThat(util.extractUsername(legacyToken)).isEqualTo("alice@example.com");
-    }
 
     @Test
-    void legacyHs256TokenRejected_whenSecretAbsent() throws Exception {
-        JwtUtil util = newJwtUtil(rsaPair(), null); // fallback disabled
+    void hs256TokenIsAlwaysRejected() throws Exception {
+        JwtUtil util = newJwtUtil(rsaPair()); // the HS256 dual-verify was retired in sub-project 1
         String legacyToken = Jwts.builder()
                 .setSubject("alice@example.com")
                 .setExpiration(new java.util.Date(System.currentTimeMillis() + 60_000))
@@ -130,8 +125,8 @@ class JwtUtilRs256Test {
 
     @Test
     void tokenSignedByDifferentRsaKeyRejected() throws Exception {
-        JwtUtil trusted = newJwtUtil(rsaPair(), null);
-        JwtUtil attacker = newJwtUtil(rsaPair(), null);
+        JwtUtil trusted = newJwtUtil(rsaPair());
+        JwtUtil attacker = newJwtUtil(rsaPair());
         String forged = attacker.generateToken(alice());
         assertThatThrownBy(() -> trusted.extractUsername(forged))
                 .isInstanceOf(SignatureException.class);
@@ -139,7 +134,7 @@ class JwtUtilRs256Test {
 
     @Test
     void unsignedAlgNoneTokenRejected() throws Exception {
-        JwtUtil util = newJwtUtil(rsaPair(), LEGACY_SECRET);
+        JwtUtil util = newJwtUtil(rsaPair());
         String unsigned = Jwts.builder().setSubject("alice@example.com").compact(); // alg=none
         assertThatThrownBy(() -> util.extractUsername(unsigned))
                 .isInstanceOf(UnsupportedJwtException.class);
@@ -148,16 +143,16 @@ class JwtUtilRs256Test {
     @Test
     void algConfusion_hs256SignedWithPublicKeyBytes_rejected() throws Exception {
         KeyPair pair = rsaPair();
-        JwtUtil util = newJwtUtil(pair, LEGACY_SECRET);
+        JwtUtil util = newJwtUtil(pair);
         // Classic key-confusion attack: use the PUBLIC key bytes as an HMAC secret.
         String forged = Jwts.builder()
                 .setSubject("alice@example.com")
                 .setExpiration(new java.util.Date(System.currentTimeMillis() + 60_000))
                 .signWith(Keys.hmacShaKeyFor(pair.getPublic().getEncoded()), SignatureAlgorithm.HS256)
                 .compact();
-        // HS256 resolves to the LEGACY secret (never the public key), so the signature can't match.
+        // HS256 is not an allowed algorithm at all, so the token is refused before any key is chosen.
         assertThatThrownBy(() -> util.extractUsername(forged))
-                .isInstanceOf(SignatureException.class);
+                .isInstanceOf(UnsupportedJwtException.class);
     }
 
     @Test
@@ -165,7 +160,6 @@ class JwtUtilRs256Test {
         JwtUtil util = new JwtUtil();
         ReflectionTestUtils.setField(util, "rsaPrivateKeyPem", "bm90LWEta2V5");
         ReflectionTestUtils.setField(util, "rsaPublicKeyPem", "bm90LWEta2V5");
-        ReflectionTestUtils.setField(util, "secretKey", "");
         assertThatThrownBy(util::init).isInstanceOf(IllegalStateException.class);
     }
 
@@ -182,7 +176,6 @@ class JwtUtilRs256Test {
                 pemBase64LineWrapped("PRIVATE KEY", pair.getPrivate().getEncoded()));
         ReflectionTestUtils.setField(util, "rsaPublicKeyPem",
                 pemBase64LineWrapped("PUBLIC KEY", pair.getPublic().getEncoded()));
-        ReflectionTestUtils.setField(util, "secretKey", "");
         ReflectionTestUtils.setField(util, "jwtExpiration", 900000L);
         ReflectionTestUtils.setField(util, "refreshExpiration", 259200000L);
         util.init();
@@ -204,7 +197,6 @@ class JwtUtilRs256Test {
                 pemBase64("PRIVATE KEY", pairA.getPrivate().getEncoded()));
         ReflectionTestUtils.setField(util, "rsaPublicKeyPem",
                 pemBase64("PUBLIC KEY", pairB.getPublic().getEncoded()));
-        ReflectionTestUtils.setField(util, "secretKey", "");
         ReflectionTestUtils.setField(util, "jwtExpiration", 900000L);
         ReflectionTestUtils.setField(util, "refreshExpiration", 259200000L);
 
@@ -227,7 +219,6 @@ class JwtUtilRs256Test {
         JwtUtil util = new JwtUtil();
         ReflectionTestUtils.setField(util, "rsaPrivateKeyPem", privatePem);
         ReflectionTestUtils.setField(util, "rsaPublicKeyPem", publicPem);
-        ReflectionTestUtils.setField(util, "secretKey", "");
         ReflectionTestUtils.setField(util, "jwtExpiration", 900000L);
         ReflectionTestUtils.setField(util, "refreshExpiration", 259200000L);
 
@@ -241,5 +232,37 @@ class JwtUtilRs256Test {
                     assertThat(message).doesNotContain(
                             Base64.getEncoder().encodeToString(pairA.getPrivate().getEncoded()).substring(0, 40));
                 });
+    }
+
+    /**
+     * Sub-project 1a: the access token is self-contained — services authorise from uid +
+     * authorities alone. authorities = role names + permission names, exactly what
+     * SecurityUserDetails grants, sorted for a stable token.
+     */
+    @Test
+    void accessTokenCarriesUidAndTheUsersAuthorities() throws Exception {
+        JwtUtil util = newJwtUtil(rsaPair());
+        User bob = alice();
+        Role moderator = Role.builder().name("MODERATOR")
+                .permissions(Set.of(Permission.builder().name("problem:update").build(),
+                        Permission.builder().name("problem:create").build()))
+                .build();
+        bob.setRoles(Set.of(moderator));
+
+        String token = util.generateToken(bob);
+
+        String uid = util.extractClaims(token, c -> c.get("uid", String.class));
+        List<Object> authorities = util.extractClaims(token, c -> c.get("authorities", List.class));
+        Boolean hasRolesClaim = util.extractClaims(token, c -> c.containsKey("roles"));
+
+        assertThat(uid).isEqualTo("11111111-2222-3333-4444-555555555555");
+        assertThat(authorities).containsExactly("MODERATOR", "problem:create", "problem:update");
+        assertThat(hasRolesClaim).as("the unused roles claim is gone").isFalse();
+    }
+
+    @Test
+    void publicKeyIsExposedForTheJwksEndpoint() throws Exception {
+        KeyPair pair = rsaPair();
+        assertThat(newJwtUtil(pair).getPublicKey()).isEqualTo(pair.getPublic());
     }
 }

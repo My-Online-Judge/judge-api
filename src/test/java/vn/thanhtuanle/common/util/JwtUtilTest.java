@@ -14,8 +14,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtUtilTest {
 
-    // 48 zero-bytes, base64-encoded — JwtUtil BASE64-decodes the secret and HS256 needs >= 32 bytes.
-    private static final String SECRET = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     private static final long ACCESS_TTL = 900_000L; // 15 min
 
     private JwtUtil jwtUtil;
@@ -30,14 +28,12 @@ class JwtUtilTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // T4-9b: JwtUtil now signs with RS256, so RSA keys must be present and init() run
-        // even though this test only cares about the HS256-era jti/TTL behaviors below.
+        // JwtUtil signs with RS256, so RSA keys must be present and init() run.
         KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
         generator.initialize(2048);
         KeyPair pair = generator.generateKeyPair();
 
         jwtUtil = new JwtUtil();
-        ReflectionTestUtils.setField(jwtUtil, "secretKey", SECRET);
         ReflectionTestUtils.setField(jwtUtil, "rsaPrivateKeyPem", pemBase64("PRIVATE KEY", pair.getPrivate().getEncoded()));
         ReflectionTestUtils.setField(jwtUtil, "rsaPublicKeyPem", pemBase64("PUBLIC KEY", pair.getPublic().getEncoded()));
         ReflectionTestUtils.setField(jwtUtil, "jwtExpiration", ACCESS_TTL);
@@ -46,7 +42,9 @@ class JwtUtilTest {
     }
 
     private User user() {
-        return User.builder().username("alice@example.com").build();
+        User user = User.builder().username("alice@example.com").build();
+        user.setId(java.util.UUID.randomUUID());
+        return user;
     }
 
     @Test

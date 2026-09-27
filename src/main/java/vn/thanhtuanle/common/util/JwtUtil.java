@@ -8,14 +8,15 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.SigningKeyResolver;
 import io.jsonwebtoken.SigningKeyResolverAdapter;
 import io.jsonwebtoken.UnsupportedJwtException;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
-import vn.thanhtuanle.entity.Role;
+import vn.thanhtuanle.auth.SecurityUserDetails;
 import vn.thanhtuanle.entity.User;
+import vn.thanhtuanle.oj.common.security.OjJwtAuthenticationFilter;
+import vn.thanhtuanle.oj.common.security.OjJwtDecoders;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
@@ -34,13 +35,6 @@ import java.util.function.Function;
 
 @Service
 public class JwtUtil {
-
-    /**
-     * Legacy HS256 secret. Optional: while present, old HS256 tokens still verify
-     * (time-boxed dual-verify); once the env var is removed, HS256 is rejected.
-     */
-    @Value("${application.security.jwt.secret-key:}")
-    private String secretKey;
 
     /** base64( PEM ) of the PKCS#8 RSA private key — signs every new token (RS256). */
     @Value("${application.security.jwt.rsa.private-key}")
@@ -103,6 +97,11 @@ public class JwtUtil {
         return keyId;
     }
 
+    /** Published through /.well-known/jwks.json so services can verify tokens without the private key. */
+    public RSAPublicKey getPublicKey() {
+        return rsaPublicKey;
+    }
+
     /**
      * env value = base64(PEM file); strip the armor, decode the DER body.
      *
@@ -146,18 +145,18 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
-    public String generateToken(User userDetails) {
-        return generateToken(new HashMap<>(), userDetails);
-    }
-
-    public String generateToken(Map<String, Object> extractClaims, User userDetails) {
-        // Add roles to claims
-        if (userDetails.getRoles() != null) {
-            extractClaims.put("roles", userDetails.getRoles().stream()
-                    .map(Role::getName)
-                    .toList());
-        }
-        return buildToken(extractClaims, userDetails, jwtExpiration);
+    /**
+     * Self-contained access token: {@code uid} and {@code authorities} let every service authorise
+     * the request from the token alone, with no per-request user lookup.
+     */
+    public String generateToken(User user) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(OjJwtDecoders.UID_CLAIM, user.getId().toString());
+        claims.put(OjJwtAuthenticationFilter.AUTHORITIES_CLAIM, new SecurityUserDetails(user).getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .sorted()
+                .toList());
+        return buildToken(claims, user, jwtExpiration);
     }
 
     public String generateRefreshToken(User userDetails) {
@@ -205,9 +204,8 @@ public class JwtUtil {
     }
 
     /**
-     * Two-entry allowlist keyed by the token's declared alg. The RSA public key is never
-     * offered to the HMAC path, so the classic RS256->HS256 key-confusion attack cannot
-     * type-check, and jjwt additionally enforces key/alg agreement.
+     * RS256 only. The legacy HS256 dual-verify is gone (every HS256 token expired long ago), so a
+     * token declaring any other alg — including the RS256->HS256 key-confusion trick — is refused.
      */
     private final SigningKeyResolver signingKeyResolver = new SigningKeyResolverAdapter() {
         @Override
@@ -215,9 +213,6 @@ public class JwtUtil {
             String alg = header.getAlgorithm();
             if (SignatureAlgorithm.RS256.getValue().equals(alg)) {
                 return rsaPublicKey;
-            }
-            if (SignatureAlgorithm.HS256.getValue().equals(alg) && secretKey != null && !secretKey.isBlank()) {
-                return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey));
             }
             throw new UnsupportedJwtException("JWT algorithm not allowed: " + alg);
         }

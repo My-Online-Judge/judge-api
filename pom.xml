@@ -59,6 +59,17 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!-- Verifies access tokens through JWKS (NimbusJwtDecoder + JwtAuthenticationToken). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+		</dependency>
+		<!-- Code shared by the OJ services (lenient JWT filter, CurrentUser, fingerprint, Redis keys). -->
+		<dependency>
+			<groupId>vn.thanhtuanle</groupId>
+			<artifactId>oj-common</artifactId>
+			<version>0.1.0</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

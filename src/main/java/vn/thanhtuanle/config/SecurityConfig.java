@@ -16,6 +16,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import vn.thanhtuanle.auth.JwksController;
 
 @Configuration
 @EnableMethodSecurity
@@ -44,6 +45,8 @@ public class SecurityConfig {
             "/actuator/metrics/**",
             "/actuator/health",
             "/actuator/health/**",
+            // Public signing key for token verification (internal; not routed by the gateway).
+            JwksController.PATH,
     };
 
     @Bean
