@@ -10,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vn.thanhtuanle.auth.SessionRevoker;
 import vn.thanhtuanle.common.enums.UserStatus;
 import vn.thanhtuanle.common.exception.AppException;
 import vn.thanhtuanle.common.exception.ErrorCode;
@@ -23,6 +24,7 @@ import vn.thanhtuanle.user.mapper.UserMapper;
 
 import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -40,6 +42,7 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final SessionRevoker sessionRevoker;
 
     /** A lazy reference by id — no query — for linking an entity to the user behind the request. */
     public User getReference(UUID id) {
@@ -140,6 +143,9 @@ public class UserService {
         assertNotSelf(id);
         user.setStatus(activeOrDisabled(status));
         userRepository.save(user);
+        if (user.getStatus() != UserStatus.ACTIVE.getValue()) {
+            sessionRevoker.revokeAccessTokensAfterCommit(List.of(id));
+        }
         return userMapper.toResponse(user);
     }
 
@@ -149,6 +155,7 @@ public class UserService {
         assertNotSelf(id);
         user.setRoles(resolveRoles(roleIds));
         userRepository.save(user);
+        sessionRevoker.revokeAccessTokensAfterCommit(List.of(id));
         return userMapper.toResponse(user);
     }
 
@@ -167,6 +174,7 @@ public class UserService {
         assertNotSelf(id);
         user.setStatus(UserStatus.DELETED.getValue());
         userRepository.save(user);
+        sessionRevoker.revokeAccessTokensAfterCommit(List.of(id));
         log.info("Soft-deleted user {}", user.getUsername());
     }
 

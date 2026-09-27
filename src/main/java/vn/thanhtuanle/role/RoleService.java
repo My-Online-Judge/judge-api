@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vn.thanhtuanle.auth.SessionRevoker;
 import vn.thanhtuanle.common.exception.AppException;
 import vn.thanhtuanle.common.exception.ErrorCode;
 import vn.thanhtuanle.entity.Permission;
@@ -33,6 +34,7 @@ public class RoleService {
     private final PermissionRepository permissionRepository;
     private final UserRepository userRepository;
     private final RoleMapper roleMapper;
+    private final SessionRevoker sessionRevoker;
 
     public List<RoleResponse> listRoles() {
         return roleMapper.toResponses(roleRepository.findAll(Sort.by("name")));
@@ -105,6 +107,8 @@ public class RoleService {
 
         role.setPermissions(new HashSet<>(resolved));
         roleRepository.save(role);
+        // Every holder's token still lists the old permissions: revoke so they refresh into the new set.
+        sessionRevoker.revokeAccessTokensAfterCommit(userRepository.findIdsByRoleId(roleId));
         return roleMapper.toResponse(role);
     }
 }

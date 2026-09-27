@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import vn.thanhtuanle.auth.SessionRevoker;
 import vn.thanhtuanle.common.enums.UserStatus;
 import vn.thanhtuanle.common.exception.AppException;
 import vn.thanhtuanle.common.exception.ErrorCode;
@@ -36,6 +37,8 @@ class UserServiceRolesTest {
     @Mock RoleRepository roleRepository;
     @Mock UserMapper userMapper;
     @Mock PasswordEncoder passwordEncoder;
+
+    @Mock SessionRevoker sessionRevoker;
 
     @Spy @InjectMocks UserService userService;
 
@@ -124,5 +127,18 @@ class UserServiceRolesTest {
                 .isInstanceOfSatisfying(AppException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ROLE_NOT_EXISTED));
         verify(userRepository, never()).save(any());
+    }
+    @Test
+    void changingAUsersRolesRevokesTheirAccessTokens() {
+        UUID id = UUID.randomUUID();
+        UUID modId = UUID.randomUUID();
+        Role moderator = Role.builder().name("MODERATOR").build();
+        moderator.setId(modId);
+        when(userRepository.findById(id)).thenReturn(Optional.of(user(id, "USER")));
+        when(roleRepository.findById(modId)).thenReturn(Optional.of(moderator));
+
+        userService.updateRoles(id, Set.of(modId));
+
+        verify(sessionRevoker).revokeAccessTokensAfterCommit(java.util.List.of(id));
     }
 }

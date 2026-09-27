@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import vn.thanhtuanle.auth.SessionRevoker;
 import vn.thanhtuanle.common.exception.AppException;
 import vn.thanhtuanle.common.exception.ErrorCode;
 import vn.thanhtuanle.entity.Permission;
@@ -12,6 +13,7 @@ import vn.thanhtuanle.entity.Role;
 import vn.thanhtuanle.permission.PermissionRepository;
 import vn.thanhtuanle.role.dto.RoleResponse;
 import vn.thanhtuanle.user.RoleRepository;
+import vn.thanhtuanle.user.UserRepository;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +34,8 @@ class RoleServiceUpdatePermissionsTest {
     @Mock RoleRepository roleRepository;
     @Mock PermissionRepository permissionRepository;
     @Mock RoleMapper roleMapper;
+    @Mock UserRepository userRepository;
+    @Mock SessionRevoker sessionRevoker;
 
     @InjectMocks RoleService roleService;
 
@@ -110,5 +114,18 @@ class RoleServiceUpdatePermissionsTest {
         assertThat(user.getPermissions()).isEmpty();
         verify(permissionRepository, never()).findByNameIn(any());
         verify(roleRepository).save(user);
+    }
+    @Test
+    void changingARolesPermissionsRevokesEveryHoldersAccessTokens() {
+        Role moderator = role("MODERATOR");
+        UUID holderA = UUID.randomUUID();
+        UUID holderB = UUID.randomUUID();
+        when(roleRepository.findById(moderator.getId())).thenReturn(Optional.of(moderator));
+        when(permissionRepository.findByNameIn(anyCollection())).thenReturn(List.of(perm("problem:create")));
+        when(userRepository.findIdsByRoleId(moderator.getId())).thenReturn(List.of(holderA, holderB));
+
+        roleService.updatePermissions(moderator.getId(), Set.of("problem:create"));
+
+        verify(sessionRevoker).revokeAccessTokensAfterCommit(List.of(holderA, holderB));
     }
 }

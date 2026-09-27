@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import vn.thanhtuanle.auth.SessionRevoker;
 import vn.thanhtuanle.common.enums.UserStatus;
 import vn.thanhtuanle.common.exception.AppException;
 import vn.thanhtuanle.common.exception.ErrorCode;
@@ -37,6 +38,8 @@ class UserServiceMutationTest {
     @Mock RoleRepository roleRepository;
     @Mock UserMapper userMapper;
     @Mock PasswordEncoder passwordEncoder;
+
+    @Mock SessionRevoker sessionRevoker;
 
     @Spy @InjectMocks UserService userService;
 
@@ -182,5 +185,34 @@ class UserServiceMutationTest {
                 .isInstanceOfSatisfying(AppException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.USER_PROTECTED));
         verify(userRepository, never()).save(any());
+    }
+    @Test
+    void disablingAUserRevokesTheirAccessTokens() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findById(id)).thenReturn(Optional.of(user(id)));
+
+        userService.updateStatus(id, UserStatus.DISABLED.getValue());
+
+        verify(sessionRevoker).revokeAccessTokensAfterCommit(java.util.List.of(id));
+    }
+
+    @Test
+    void reactivatingAUserRevokesNothing() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findById(id)).thenReturn(Optional.of(user(id)));
+
+        userService.updateStatus(id, UserStatus.ACTIVE.getValue());
+
+        verify(sessionRevoker, org.mockito.Mockito.never()).revokeAccessTokensAfterCommit(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void softDeletingAUserRevokesTheirAccessTokens() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findById(id)).thenReturn(Optional.of(user(id)));
+
+        userService.softDelete(id);
+
+        verify(sessionRevoker).revokeAccessTokensAfterCommit(java.util.List.of(id));
     }
 }
