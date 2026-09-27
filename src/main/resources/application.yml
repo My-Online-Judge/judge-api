@@ -65,7 +65,8 @@ logging:
     root: INFO
     web: INFO
   pattern:
-    correlation: "[%X{submissionId:-}] "
+    # trace_id is put in the MDC by the OpenTelemetry Java agent; it links a log line to its trace in Jaeger.
+    correlation: "[%X{trace_id:-}] [%X{submissionId:-}] "
 
 judge:
   server:
