@@ -28,6 +28,12 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # Local Redis answers in well under a millisecond. Without these, a Redis that stops answering
+      # holds each call (rate limiters, logout blocklist, the after-commit revocation write) for
+      # Lettuce's 60 s default before the caller's fallback runs. The command timeout also bounds
+      # the connection handshake.
+      timeout: 1s
+      connect-timeout: 1s
       # We use Redis only for pub/sub fan-out, not Spring Data Redis repositories.
       repositories:
         enabled: false
