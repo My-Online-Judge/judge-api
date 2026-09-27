@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import vn.thanhtuanle.oj.common.redis.RedisKeys;
 import vn.thanhtuanle.common.enums.BanType;
 import vn.thanhtuanle.entity.AccessBan;
 
@@ -20,8 +21,6 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 @Slf4j
 public class AccessBanMirror {
-
-    static final String KEY_PREFIX = "oj:ban:";
 
     private final StringRedisTemplate redis;
 
@@ -51,20 +50,8 @@ public class AccessBanMirror {
         }
     }
 
-    /** Fail-open: if Redis is down nobody is considered banned. */
-    public boolean isBanned(BanType type, String value) {
-        if (value == null || value.isBlank()) {
-            return false;
-        }
-        try {
-            return Boolean.TRUE.equals(redis.hasKey(key(type, value)));
-        } catch (Exception e) {
-            log.warn("Ban mirror unavailable, allowing request: {}", e.getMessage());
-            return false;
-        }
-    }
 
     static String key(BanType type, String value) {
-        return KEY_PREFIX + type.name().toLowerCase() + ":" + value;
+        return RedisKeys.accessBan(type.name(), value);
     }
 }

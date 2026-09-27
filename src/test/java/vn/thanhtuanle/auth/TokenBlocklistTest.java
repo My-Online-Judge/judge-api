@@ -10,11 +10,8 @@ import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -53,26 +50,6 @@ class TokenBlocklistTest {
     void block_withNullJti_isANoOp() {
         blocklist.block(null, 900_000L);
 
-        verifyNoInteractions(redisTemplate);
-    }
-
-    @Test
-    void isBlocked_trueWhenTheKeyExists() {
-        when(redisTemplate.hasKey("oj:token:blocklist:jti-123")).thenReturn(true);
-
-        assertThat(blocklist.isBlocked("jti-123")).isTrue();
-    }
-
-    @Test
-    void isBlocked_falseWhenTheKeyIsAbsent() {
-        when(redisTemplate.hasKey(any())).thenReturn(false);
-
-        assertThat(blocklist.isBlocked("never-blocked")).isFalse();
-    }
-
-    @Test
-    void isBlocked_falseForNullJti_withoutHittingRedis() {
-        assertThat(blocklist.isBlocked(null)).isFalse();
         verifyNoInteractions(redisTemplate);
     }
 }

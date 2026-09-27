@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import vn.thanhtuanle.oj.common.redis.RedisKeys;
 
 import java.time.Duration;
 
@@ -12,16 +13,13 @@ import java.time.Duration;
  *
  * <p>On logout a token's jti is parked here with a TTL equal to the token's remaining lifetime, so
  * the entry self-evicts exactly when the token would have expired anyway — the list never grows
- * unbounded. {@link JwtAuthenticationFilter} consults it on every request and refuses a blocklisted
- * token, which is what makes logout (and short-TTL access tokens) actually invalidate a token that
- * is otherwise still signature-valid.
+ * unbounded. The api-gateway reads it on every request and strips a blocklisted token, which is what
+ * makes logout actually invalidate a token that is otherwise still signature-valid.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class TokenBlocklist {
-
-    static final String KEY_PREFIX = "oj:token:blocklist:";
 
     private final StringRedisTemplate redisTemplate;
 
@@ -33,14 +31,7 @@ public class TokenBlocklist {
         if (jti == null || ttlMillis <= 0) {
             return;
         }
-        redisTemplate.opsForValue().set(KEY_PREFIX + jti, "1", Duration.ofMillis(ttlMillis));
+        redisTemplate.opsForValue().set(RedisKeys.tokenBlocklist(jti), "1", Duration.ofMillis(ttlMillis));
     }
 
-    /** True if this jti has been revoked and not yet expired out of Redis. */
-    public boolean isBlocked(String jti) {
-        if (jti == null) {
-            return false;
-        }
-        return Boolean.TRUE.equals(redisTemplate.hasKey(KEY_PREFIX + jti));
-    }
 }

@@ -1,6 +1,5 @@
 package vn.thanhtuanle.metrics;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,8 +10,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import vn.thanhtuanle.security.AccessBanFilter;
-import vn.thanhtuanle.security.AccessBanMirror;
 import vn.thanhtuanle.security.LoginRateLimiter;
 import vn.thanhtuanle.security.SubmissionRateLimiter;
 
@@ -34,7 +31,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MetricPreRegistrationTest {
 
     @Mock StringRedisTemplate redis;
-    @Mock AccessBanMirror mirror;
 
     MeterRegistry registry;
 
@@ -57,10 +53,4 @@ class MetricPreRegistrationTest {
         assertThat(registry.find("oj.submission.rate_limited").counter()).isNotNull();
     }
 
-    @Test
-    void accessBanFilterHoldsItsCounter() {
-        new AccessBanFilter(mirror, new ObjectMapper(), registry);
-
-        assertThat(registry.find("oj.request.banned").counter()).isNotNull();
-    }
 }
