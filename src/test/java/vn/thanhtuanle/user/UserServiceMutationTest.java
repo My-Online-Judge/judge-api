@@ -186,6 +186,7 @@ class UserServiceMutationTest {
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.USER_PROTECTED));
         verify(userRepository, never()).save(any());
     }
+
     @Test
     void disablingAUserRevokesTheirAccessTokens() {
         UUID id = UUID.randomUUID();
@@ -214,5 +215,25 @@ class UserServiceMutationTest {
         userService.softDelete(id);
 
         verify(sessionRevoker).revokeAccessTokensAfterCommit(java.util.List.of(id));
+    }
+
+    @Test
+    void disablingAUserThroughTheEditFormRevokesTheirAccessTokens() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findById(id)).thenReturn(Optional.of(user(id)));
+
+        userService.update(id, req(null, null, UserStatus.DISABLED.getValue()));
+
+        verify(sessionRevoker).revokeAccessTokensAfterCommit(java.util.List.of(id));
+    }
+
+    @Test
+    void editingOnlyTheProfileRevokesNothing() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findById(id)).thenReturn(Optional.of(user(id)));
+
+        userService.update(id, req("Bob", null, null));
+
+        verify(sessionRevoker, never()).revokeAccessTokensAfterCommit(any());
     }
 }

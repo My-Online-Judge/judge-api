@@ -128,6 +128,7 @@ class UserServiceRolesTest {
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ROLE_NOT_EXISTED));
         verify(userRepository, never()).save(any());
     }
+
     @Test
     void changingAUsersRolesRevokesTheirAccessTokens() {
         UUID id = UUID.randomUUID();

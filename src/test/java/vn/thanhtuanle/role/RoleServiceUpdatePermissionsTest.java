@@ -115,6 +115,7 @@ class RoleServiceUpdatePermissionsTest {
         verify(permissionRepository, never()).findByNameIn(any());
         verify(roleRepository).save(user);
     }
+
     @Test
     void changingARolesPermissionsRevokesEveryHoldersAccessTokens() {
         Role moderator = role("MODERATOR");

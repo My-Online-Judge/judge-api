@@ -134,6 +134,10 @@ public class UserService {
             user.setStatus(activeOrDisabled(req.getStatus()));
         }
         userRepository.save(user);
+        // The edit form can disable too; like updateStatus, that must end the user's sessions now.
+        if (req.getStatus() != null && user.getStatus() != UserStatus.ACTIVE.getValue()) {
+            sessionRevoker.revokeAccessTokensAfterCommit(List.of(id));
+        }
         return userMapper.toResponse(user);
     }
 
