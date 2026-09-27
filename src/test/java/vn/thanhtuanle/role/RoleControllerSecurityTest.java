@@ -10,18 +10,17 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-import vn.thanhtuanle.common.util.JwtUtil;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import vn.thanhtuanle.config.CustomAccessDeniedHandler;
 import vn.thanhtuanle.config.CustomAuthenticationEntryPoint;
-import vn.thanhtuanle.config.JwtAuthenticationFilter;
-import vn.thanhtuanle.auth.TokenBlocklist;
+import vn.thanhtuanle.oj.common.security.OjJwtAuthenticationFilter;
 import vn.thanhtuanle.config.SecurityConfig;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = RoleController.class)
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class,
+@Import({SecurityConfig.class, OjJwtAuthenticationFilter.class,
         CustomAuthenticationEntryPoint.class, CustomAccessDeniedHandler.class})
 @ActiveProfiles("test")
 class RoleControllerSecurityTest {
@@ -32,11 +31,9 @@ class RoleControllerSecurityTest {
     @MockBean
     private RoleService roleService;
     @MockBean
-    private JwtUtil jwtUtil;
+    private JwtDecoder jwtDecoder;
     @MockBean
     private UserDetailsService userDetailsService;
-    @MockBean
-    private TokenBlocklist tokenBlocklist;
 
     @Test
     @WithMockUser(authorities = "role:read")
@@ -58,7 +55,7 @@ class RoleControllerSecurityTest {
 
     @Test
     void unauthorized_withNoToken() throws Exception {
-        // No @WithMockUser: this exercises the real filter chain (JwtAuthenticationFilter +
+        // No @WithMockUser: this exercises the real filter chain (OjJwtAuthenticationFilter +
         // CustomAuthenticationEntryPoint) end to end, not just the entry point bean in
         // isolation. 401 = "not authenticated, go refresh" -- distinct from the 403 RBAC
         // denials above, which must stay 403.

@@ -24,6 +24,7 @@ import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedAppEvent;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
+import vn.thanhtuanle.oj.common.security.CurrentUser;
 import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
@@ -52,6 +53,7 @@ public class SubmissionService {
     // Shared transactional EntityManager proxy — used only for refresh() in streamVerdict.
     private final EntityManager entityManager;
     private final SubmissionRateLimiter submissionRateLimiter;
+    private final CurrentUser currentUser;
 
     @Transactional
     public SubmissionResponseDto submit(SubmissionRequestDto req) {
@@ -62,13 +64,13 @@ public class SubmissionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found"));
         Language language = languageRepository.findByIdentifier(req.getLanguageIdentifier())
                 .orElseThrow(() -> new ResourceNotFoundException("Language not found"));
-        User currentUser = userService.getCurrentUser();
+        UUID userId = currentUser.id();
 
         // Cooldown gate: sits after problem/language/user resolve so a 404 never burns it,
         // and before the row exists so a throttled submit leaves no trace.
-        submissionRateLimiter.acquire(currentUser.getId());
+        submissionRateLimiter.acquire(userId);
 
-        Submission submission = createPendingSubmission(req, problem, language, currentUser);
+        Submission submission = createPendingSubmission(req, problem, language, userService.getReference(userId));
         submissionRepository.save(submission);
         MDC.put("submissionId", submission.getId().toString());
         try {
@@ -160,7 +162,7 @@ public class SubmissionService {
         log.info("Service to get submissions by user_id: {}", userId);
 
         UUID requested = UUID.fromString(userId);
-        if (!requested.equals(userService.getCurrentUser().getId()) && !hasReadAnyAuthority()) {
+        if (!requested.equals(currentUser.id()) && !hasReadAnyAuthority()) {
             throw new ResourceNotFoundException("Submissions not found for user: " + userId);
         }
 
@@ -179,7 +181,7 @@ public class SubmissionService {
         log.info("Service to get submissions by user_id: {} and problem_slug: {}", userId, problemSlug);
 
         UUID requested = UUID.fromString(userId);
-        if (!requested.equals(userService.getCurrentUser().getId()) && !hasReadAnyAuthority()) {
+        if (!requested.equals(currentUser.id()) && !hasReadAnyAuthority()) {
             throw new ResourceNotFoundException("Submissions not found for user: " + userId);
         }
 
@@ -198,13 +200,13 @@ public class SubmissionService {
      * than a 403, so the response does not confirm that an id exists.
      */
     private void assertCanRead(Submission submission, String id) {
-        User current = userService.getCurrentUser();
+        UUID current = currentUser.id();
         boolean isOwner = submission.getUser() != null
-                && submission.getUser().getId().equals(current.getId());
+                && submission.getUser().getId().equals(current);
         if (isOwner || hasReadAnyAuthority()) {
             return;
         }
-        log.warn("User {} denied access to submission {}", current.getId(), id);
+        log.warn("User {} denied access to submission {}", current, id);
         throw new ResourceNotFoundException("Submission not found with id: " + id);
     }
 

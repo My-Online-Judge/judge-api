@@ -41,6 +41,11 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
+    /** A lazy reference by id — no query — for linking an entity to the user behind the request. */
+    public User getReference(UUID id) {
+        return userRepository.getReferenceById(id);
+    }
+
     public User getCurrentUser() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();

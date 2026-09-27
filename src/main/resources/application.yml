@@ -76,6 +76,11 @@ judge:
   reconcile-interval-ms: ${JUDGE_RECONCILE_INTERVAL_MS:60000}
 
 oj:
+  security:
+    jwt:
+      # judge-api verifies its own tokens through its JWKS for now; sub-project 1b points this at
+      # identity-service. Fetched lazily, on the first request that carries a token.
+      jwks-uri: ${OJ_JWKS_URI:http://localhost:${server.port}/.well-known/jwks.json}
   submission:
     cooldown-seconds: ${SUBMISSION_COOLDOWN_SECONDS:10}
 

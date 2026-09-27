@@ -19,6 +19,7 @@ import vn.thanhtuanle.language.LanguageRepository;
 import vn.thanhtuanle.problem.ProblemRepository;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
+import vn.thanhtuanle.oj.common.security.CurrentUser;
 import vn.thanhtuanle.user.UserService;
 
 import java.util.Optional;
@@ -39,6 +40,7 @@ class SubmissionServiceStreamTest {
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock UserService userService;
+    @Mock CurrentUser currentUser;
     @Mock ApplicationEventPublisher applicationEventPublisher;
     @Mock SubmissionSseRegistry sseRegistry;
     @Mock SubmissionDetailAssembler detailAssembler;
@@ -60,7 +62,7 @@ class SubmissionServiceStreamTest {
         SseEmitter emitter = new SseEmitter();
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.ACCEPTED.getValue());
-        when(userService.getCurrentUser()).thenReturn(owner);
+        when(currentUser.id()).thenReturn(owner.getId());
         when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
         when(submissionMapper.toDto(eq(s), any())).thenReturn(dto);
 
@@ -90,7 +92,7 @@ class SubmissionServiceStreamTest {
         s.setStatus(SubmissionResult.PENDING.getValue());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.PENDING.getValue());
-        when(userService.getCurrentUser()).thenReturn(owner);
+        when(currentUser.id()).thenReturn(owner.getId());
         when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
 
         submissionService.streamVerdict(id.toString());
@@ -111,7 +113,7 @@ class SubmissionServiceStreamTest {
         s.setStatus(SubmissionResult.JUDGING.getValue());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.JUDGING.getValue());
-        when(userService.getCurrentUser()).thenReturn(owner);
+        when(currentUser.id()).thenReturn(owner.getId());
         when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
 
         submissionService.streamVerdict(id.toString());
@@ -151,7 +153,7 @@ class SubmissionServiceStreamTest {
             managed.setStatus(SubmissionResult.ACCEPTED.getValue());
             return null;
         }).when(entityManager).refresh(managed);
-        when(userService.getCurrentUser()).thenReturn(owner);
+        when(currentUser.id()).thenReturn(owner.getId());
         when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
         when(submissionMapper.toDto(eq(managed), any())).thenReturn(dto);
 
@@ -175,7 +177,7 @@ class SubmissionServiceStreamTest {
         s.setStatus(SubmissionResult.PENDING.getValue());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         when(submissionRepository.findStatusById(id)).thenReturn(null);
-        when(userService.getCurrentUser()).thenReturn(owner);
+        when(currentUser.id()).thenReturn(owner.getId());
         when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
 
         submissionService.streamVerdict(id.toString());

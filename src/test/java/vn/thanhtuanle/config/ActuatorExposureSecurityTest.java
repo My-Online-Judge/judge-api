@@ -21,9 +21,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * <p>This uses a full {@link SpringBootTest} (not a {@code @WebMvcTest} slice) with a real
  * {@code test}-profile context, because actuator's web endpoint handler mapping is only
  * registered on the full application context. {@code @WithMockUser} establishes a plain,
- * non-admin authenticated principal; {@link JwtAuthenticationFilter} passes such requests
+ * non-admin authenticated principal; oj-common's {@code OjJwtAuthenticationFilter} passes such requests
  * through unchanged (no Authorization header/cookie present), so the mock-user context
- * survives it -- see {@code JwtAuthenticationFilter#doFilterInternal}.
+ * survives it -- it never replaces an existing authentication.
  *
  * <p>{@code /actuator/heapdump} is deliberately NOT exercised here: hitting it pre-fix would
  * generate a real heap dump (slow, large, and would leak an artifact into CI). It is governed

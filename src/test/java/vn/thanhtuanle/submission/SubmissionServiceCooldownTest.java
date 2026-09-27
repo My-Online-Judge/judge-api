@@ -24,6 +24,7 @@ import vn.thanhtuanle.security.SubmissionRateLimiter;
 import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
+import vn.thanhtuanle.oj.common.security.CurrentUser;
 import vn.thanhtuanle.user.UserService;
 
 import java.util.Optional;
@@ -48,6 +49,7 @@ class SubmissionServiceCooldownTest {
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock UserService userService;
+    @Mock CurrentUser currentUser;
     @Mock ApplicationEventPublisher applicationEventPublisher;
     @Mock SubmissionSseRegistry sseRegistry;
     @Mock SubmissionRateLimiter submissionRateLimiter;
@@ -68,7 +70,8 @@ class SubmissionServiceCooldownTest {
         user.setId(userId);
         when(problemRepository.findByProblemSlug("simple-a-plus-b")).thenReturn(Optional.of(new Problem()));
         when(languageRepository.findByIdentifier("python3")).thenReturn(Optional.of(new Language()));
-        when(userService.getCurrentUser()).thenReturn(user);
+        when(currentUser.id()).thenReturn(userId);
+        when(userService.getReference(userId)).thenReturn(user);
         when(submissionRepository.save(any())).thenAnswer(inv -> {
             Submission s = inv.getArgument(0);
             s.setId(UUID.randomUUID());

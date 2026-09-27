@@ -12,6 +12,7 @@ import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.dto.TestCaseResultDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
+import vn.thanhtuanle.oj.common.security.CurrentUser;
 import vn.thanhtuanle.user.UserService;
 
 import java.util.List;
@@ -30,6 +31,7 @@ class SubmissionServiceDetailsTest {
     @Mock SubmissionMapper submissionMapper;
     @Mock SubmissionDetailAssembler detailAssembler;
     @Mock UserService userService;
+    @Mock CurrentUser currentUser;
     @InjectMocks SubmissionService service;
 
     @Test
@@ -40,7 +42,7 @@ class SubmissionServiceDetailsTest {
         Submission s = Submission.builder().problem(new Problem()).user(owner).build();
         s.setId(id);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
-        when(userService.getCurrentUser()).thenReturn(owner);
+        when(currentUser.id()).thenReturn(owner.getId());
 
         List<TestCaseResultDto> rows = List.of(
                 TestCaseResultDto.builder().name("1").result(0).build());

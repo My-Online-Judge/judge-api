@@ -10,18 +10,17 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-import vn.thanhtuanle.common.util.JwtUtil;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import vn.thanhtuanle.config.CustomAccessDeniedHandler;
 import vn.thanhtuanle.config.CustomAuthenticationEntryPoint;
-import vn.thanhtuanle.config.JwtAuthenticationFilter;
-import vn.thanhtuanle.auth.TokenBlocklist;
+import vn.thanhtuanle.oj.common.security.OjJwtAuthenticationFilter;
 import vn.thanhtuanle.config.SecurityConfig;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ProblemController.class)
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class,
+@Import({SecurityConfig.class, OjJwtAuthenticationFilter.class,
         CustomAuthenticationEntryPoint.class, CustomAccessDeniedHandler.class})
 @ActiveProfiles("test")
 class ProblemControllerSecurityTest {
@@ -32,11 +31,9 @@ class ProblemControllerSecurityTest {
     @MockBean
     private ProblemService problemService;
     @MockBean
-    private JwtUtil jwtUtil;
+    private JwtDecoder jwtDecoder;
     @MockBean
     private UserDetailsService userDetailsService;
-    @MockBean
-    private TokenBlocklist tokenBlocklist;
 
     @Test
     @WithMockUser(authorities = "problem:delete")

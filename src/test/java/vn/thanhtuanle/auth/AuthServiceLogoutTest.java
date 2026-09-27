@@ -6,8 +6,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import vn.thanhtuanle.common.util.JwtUtil;
 import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.repository.TokenRepository;
@@ -40,8 +41,10 @@ class AuthServiceLogoutTest {
     }
 
     private void authenticateAs(String username, String token) {
+        // What OjJwtAuthenticationFilter puts in the context for a verified access token.
+        Jwt jwt = Jwt.withTokenValue(token).header("alg", "RS256").subject(username).build();
         SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(username, token, Collections.emptyList()));
+                new JwtAuthenticationToken(jwt, Collections.emptyList(), username));
     }
 
     @Test

@@ -13,6 +13,7 @@ import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
+import vn.thanhtuanle.oj.common.security.CurrentUser;
 import vn.thanhtuanle.user.UserService;
 
 import java.util.Optional;
@@ -34,6 +35,7 @@ class SubmissionServiceAuthorizationTest {
     @Mock SubmissionMapper submissionMapper;
     @Mock SubmissionDetailAssembler detailAssembler;
     @Mock UserService userService;
+    @Mock CurrentUser currentUser;
     @Mock SubmissionSseRegistry sseRegistry;
     @InjectMocks SubmissionService service;
 
@@ -57,7 +59,7 @@ class SubmissionServiceAuthorizationTest {
         Submission s = ownedBy(subId, owner);
 
         when(submissionRepository.findById(subId)).thenReturn(Optional.of(s));
-        when(userService.getCurrentUser()).thenReturn(owner);
+        when(currentUser.id()).thenReturn(owner.getId());
         when(submissionMapper.toDto(eq(s), any()))
                 .thenReturn(SubmissionResponseDto.builder().build());
 
@@ -70,7 +72,7 @@ class SubmissionServiceAuthorizationTest {
         Submission s = ownedBy(subId, user(UUID.randomUUID()));
 
         when(submissionRepository.findById(subId)).thenReturn(Optional.of(s));
-        when(userService.getCurrentUser()).thenReturn(user(UUID.randomUUID()));
+        when(currentUser.id()).thenReturn(UUID.randomUUID());
 
         assertThatThrownBy(() -> service.getSubmissionById(subId.toString()))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -82,7 +84,7 @@ class SubmissionServiceAuthorizationTest {
         Submission s = ownedBy(subId, user(UUID.randomUUID()));
 
         when(submissionRepository.findById(subId)).thenReturn(Optional.of(s));
-        when(userService.getCurrentUser()).thenReturn(user(UUID.randomUUID()));
+        when(currentUser.id()).thenReturn(UUID.randomUUID());
 
         assertThatThrownBy(() -> service.streamVerdict(subId.toString()))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -108,7 +110,7 @@ class SubmissionServiceAuthorizationTest {
     @Test
     void getSubmissionsByUser_otherUserWithoutReadAny_deniedAndRepositoryNeverQueried() {
         UUID requestedUserId = UUID.randomUUID();
-        when(userService.getCurrentUser()).thenReturn(user(UUID.randomUUID()));
+        when(currentUser.id()).thenReturn(UUID.randomUUID());
 
         assertThatThrownBy(() -> service.getSubmissionsByUser(requestedUserId.toString(), 0, 10))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -119,7 +121,7 @@ class SubmissionServiceAuthorizationTest {
     @Test
     void getSubmissionsByUser_ownId_succeeds() {
         UUID userId = UUID.randomUUID();
-        when(userService.getCurrentUser()).thenReturn(user(userId));
+        when(currentUser.id()).thenReturn(userId);
         when(submissionRepository.findByUserIdOrderByCreatedAtDesc(eq(userId), any()))
                 .thenReturn(Page.empty());
 
@@ -129,7 +131,7 @@ class SubmissionServiceAuthorizationTest {
     @Test
     void getSubmissionsByUserAndProblem_otherUserWithoutReadAny_deniedAndRepositoryNeverQueried() {
         UUID requestedUserId = UUID.randomUUID();
-        when(userService.getCurrentUser()).thenReturn(user(UUID.randomUUID()));
+        when(currentUser.id()).thenReturn(UUID.randomUUID());
 
         assertThatThrownBy(() -> service.getSubmissionsByUserAndProblem(requestedUserId.toString(), "two-sum", 0, 10))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -140,7 +142,7 @@ class SubmissionServiceAuthorizationTest {
     @Test
     void getSubmissionsByUserAndProblem_ownId_succeeds() {
         UUID userId = UUID.randomUUID();
-        when(userService.getCurrentUser()).thenReturn(user(userId));
+        when(currentUser.id()).thenReturn(userId);
         when(submissionRepository.findByUserIdAndProblemSlugOrderByCreatedAtDesc(eq(userId), eq("two-sum"), any()))
                 .thenReturn(Page.empty());
 

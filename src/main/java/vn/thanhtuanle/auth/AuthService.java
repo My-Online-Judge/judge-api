@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -334,9 +335,10 @@ public class AuthService {
                 });
 
         // Revoke the access token the caller is holding right now: park its jti in Redis until it
-        // would have expired, so JwtAuthenticationFilter refuses it immediately (the DB revoke below
-        // only invalidates refresh tokens — the filter never consults the DB).
-        if (authentication.getCredentials() instanceof String accessToken) {
+        // would have expired, so the gateway strips it from any further request (the DB revoke below
+        // only invalidates refresh tokens — access tokens are verified without the DB).
+        if (authentication instanceof JwtAuthenticationToken jwtAuthentication) {
+            String accessToken = jwtAuthentication.getToken().getTokenValue();
             tokenBlocklist.block(jwtUtil.extractJti(accessToken), jwtUtil.getRemainingTtlMillis(accessToken));
         }
 
