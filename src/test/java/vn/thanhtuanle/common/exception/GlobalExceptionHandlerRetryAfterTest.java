@@ -20,11 +20,4 @@ class GlobalExceptionHandlerRetryAfterTest {
         assertThat(res.getHeaders().getFirst("Retry-After")).isEqualTo("7");
         assertThat(res.getBody().getMessage()).contains("submitting too fast");
     }
-
-    @Test
-    void loginRateLimit_keepsItsFixed900() {
-        ResponseEntity<ApiResponse<Object>> res =
-                handler.handleAppException(new AppException(ErrorCode.RATE_LIMITED));
-        assertThat(res.getHeaders().getFirst("Retry-After")).isEqualTo("900");
-    }
 }

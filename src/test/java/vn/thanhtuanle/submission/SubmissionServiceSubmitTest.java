@@ -13,7 +13,6 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Language;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
-import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedAppEvent;
@@ -23,7 +22,6 @@ import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 import vn.thanhtuanle.oj.common.security.CurrentUser;
-import vn.thanhtuanle.user.UserService;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -40,11 +38,10 @@ class SubmissionServiceSubmitTest {
     @Mock ProblemRepository problemRepository;
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
-    @Mock UserService userService;
     @Mock CurrentUser currentUser;
     @Mock ApplicationEventPublisher applicationEventPublisher;
     @Mock SubmissionSseRegistry sseRegistry;
-    @Mock vn.thanhtuanle.security.SubmissionRateLimiter submissionRateLimiter;
+    @Mock SubmissionRateLimiter submissionRateLimiter;
 
     @InjectMocks SubmissionService submissionService;
 
@@ -56,13 +53,11 @@ class SubmissionServiceSubmitTest {
 
         Problem problem = new Problem();
         Language language = new Language();
-        User user = new User();
-        user.setId(UUID.randomUUID());
+        UUID userId = UUID.randomUUID();
 
         when(problemRepository.findByProblemSlug("a-plus-b")).thenReturn(Optional.of(problem));
         when(languageRepository.findByIdentifier("cpp")).thenReturn(Optional.of(language));
-        when(currentUser.id()).thenReturn(user.getId());
-        when(userService.getReference(user.getId())).thenReturn(user);
+        when(currentUser.id()).thenReturn(userId);
         // simulate JPA's GenerationType.UUID assigning an id on save(), since a bare Mockito
         // mock does not run Hibernate's identifier-generation logic.
         when(submissionRepository.save(any(Submission.class))).thenAnswer(inv -> {
@@ -82,6 +77,7 @@ class SubmissionServiceSubmitTest {
         ArgumentCaptor<Submission> saved = ArgumentCaptor.forClass(Submission.class);
         verify(submissionRepository).save(saved.capture());
         assertThat(saved.getValue().getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
+        assertThat(saved.getValue().getUserId()).as("the submitter is recorded by id").isEqualTo(userId);
         verify(applicationEventPublisher).publishEvent(any(SubmissionRequestedAppEvent.class));
         assertThat(dto.getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
     }

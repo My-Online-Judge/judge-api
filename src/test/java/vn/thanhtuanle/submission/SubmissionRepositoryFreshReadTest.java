@@ -15,10 +15,8 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Language;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
-import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.language.LanguageRepository;
 import vn.thanhtuanle.problem.ProblemRepository;
-import vn.thanhtuanle.user.UserRepository;
 
 import java.util.UUID;
 
@@ -43,7 +41,6 @@ class SubmissionRepositoryFreshReadTest {
     @Autowired SubmissionRepository submissionRepository;
     @Autowired ProblemRepository problemRepository;
     @Autowired LanguageRepository languageRepository;
-    @Autowired UserRepository userRepository;
     @Autowired PlatformTransactionManager transactionManager;
     // Shared transactional proxy: inside a TransactionTemplate callback it delegates to the
     // persistence context bound to that transaction.
@@ -57,8 +54,7 @@ class SubmissionRepositoryFreshReadTest {
     @BeforeEach
     void createPendingSubmission() {
         new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
-            User user = userRepository.save(User.builder()
-                    .username("fresh-read-user-" + UUID.randomUUID()).build());
+            userId = UUID.randomUUID();
             Problem problem = problemRepository.save(Problem.builder()
                     .title("fresh-read-problem").problemSlug("fresh-read-" + UUID.randomUUID()).build());
             Language language = languageRepository.save(Language.builder()
@@ -67,9 +63,8 @@ class SubmissionRepositoryFreshReadTest {
                     .sourceCode("print(1)")
                     .status(SubmissionResult.PENDING.getValue())
                     .time(0).memory(0L)
-                    .problem(problem).language(language).user(user)
+                    .problem(problem).language(language).userId(userId)
                     .build());
-            userId = user.getId();
             problemId = problem.getId();
             languageId = language.getId();
             submissionId = submission.getId();
@@ -82,7 +77,6 @@ class SubmissionRepositoryFreshReadTest {
             submissionRepository.deleteById(submissionId);
             problemRepository.deleteById(problemId);
             languageRepository.deleteById(languageId);
-            userRepository.deleteById(userId);
         });
     }
 

@@ -1,11 +1,16 @@
 package vn.thanhtuanle.config;
 
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -15,43 +20,36 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import vn.thanhtuanle.common.util.JwtUtil;
-import vn.thanhtuanle.entity.Permission;
-import vn.thanhtuanle.entity.Role;
-import vn.thanhtuanle.entity.User;
+import vn.thanhtuanle.oj.common.security.OjJwtAuthenticationFilter;
 import vn.thanhtuanle.oj.common.security.OjJwtDecoders;
 
-import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
-import java.security.PrivateKey;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.Base64;
+import java.time.Instant;
 import java.util.Date;
-import java.util.Set;
+import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The whole request path with real tokens: judge-api's JwtUtil mints them, oj-common's lenient
- * filter and validation rules verify them inside the real SecurityConfig chain. Only the key
- * lookup differs — the decoder is keyed with judge-api's public key directly, because MockMvc has
- * no running server for the JWKS URL to reach (JWKS itself is covered by JwksControllerTest and
- * the E2E run).
+ * The whole request path with real tokens in the shape identity-service issues, verified by
+ * oj-common's lenient filter inside judge-api's real SecurityConfig chain. Only the key lookup
+ * differs: the decoder is keyed with a test key directly, because MockMvc has no identity-service
+ * for the JWKS URL to reach.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(OjJwtWiringTest.PublicKeyDecoder.class)
+@Import(OjJwtWiringTest.TestKeyDecoder.class)
 class OjJwtWiringTest {
 
+    static final RSAKey KEY = generateKey();
+
     @TestConfiguration
-    static class PublicKeyDecoder {
+    static class TestKeyDecoder {
         @Bean
-        JwtDecoder testJwtDecoder(JwtUtil jwtUtil) {
-            NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(jwtUtil.getPublicKey()).build();
+        JwtDecoder testJwtDecoder() throws JOSEException {
+            NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(KEY.toRSAPublicKey()).build();
             decoder.setJwtValidator(OjJwtDecoders.validator());
             return decoder;
         }
@@ -59,55 +57,58 @@ class OjJwtWiringTest {
 
     @Autowired
     private MockMvc mockMvc;
-    @Autowired
-    private JwtUtil jwtUtil;
-    @Value("${application.security.jwt.rsa.private-key}")
-    private String privateKeyPem;
 
-    private String tokenFor(String... permissions) {
-        Role role = Role.builder().name("TESTER").permissions(new java.util.HashSet<>()).build();
-        for (String name : permissions) {
-            role.getPermissions().add(Permission.builder().name(name).build());
+    private static RSAKey generateKey() {
+        try {
+            return new RSAKeyGenerator(2048).keyID("wiring-test").generate();
+        } catch (JOSEException e) {
+            throw new IllegalStateException(e);
         }
-        User user = User.builder().username("wiring-test").roles(Set.of(role)).build();
-        user.setId(UUID.randomUUID());
-        return jwtUtil.generateToken(user);
     }
 
-    /** Signed by judge-api's real key but shaped like a pre-1a token (roles claim, no uid). */
-    private String oldFormatToken(Date expiresAt) throws Exception {
-        String pem = new String(Base64.getMimeDecoder().decode(privateKeyPem), StandardCharsets.UTF_8)
-                .replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
-                .replaceAll("\\s", "");
-        PrivateKey key = KeyFactory.getInstance("RSA")
-                .generatePrivate(new PKCS8EncodedKeySpec(Base64.getDecoder().decode(pem)));
-        return Jwts.builder()
-                .setSubject("wiring-test")
-                .setId(UUID.randomUUID().toString())
-                .claim("roles", java.util.List.of("ADMIN"))
-                .setIssuedAt(new Date())
-                .setExpiration(expiresAt)
-                .signWith(key, SignatureAlgorithm.RS256)
-                .compact();
+    private static String sign(JWTClaimsSet claims) throws JOSEException {
+        SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(KEY.getKeyID()).build(), claims);
+        jwt.sign(new RSASSASigner(KEY));
+        return jwt.serialize();
+    }
+
+    private static JWTClaimsSet.Builder claims(Instant expiresAt) {
+        return new JWTClaimsSet.Builder()
+                .subject("wiring-test")
+                .jwtID(UUID.randomUUID().toString())
+                .issueTime(Date.from(expiresAt.minusSeconds(900)))
+                .expirationTime(Date.from(expiresAt));
+    }
+
+    private static String tokenFor(String... authorities) throws JOSEException {
+        return sign(claims(Instant.now().plusSeconds(600))
+                .claim(OjJwtDecoders.UID_CLAIM, UUID.randomUUID().toString())
+                .claim(OjJwtAuthenticationFilter.AUTHORITIES_CLAIM, List.of(authorities))
+                .build());
+    }
+
+    /** Shaped like a pre-1a token: a roles claim and no uid. */
+    private static String oldFormatToken(Instant expiresAt) throws JOSEException {
+        return sign(claims(expiresAt).claim("roles", List.of("ADMIN")).build());
     }
 
     @Test
-    void aFreshTokenAuthorisesByItsAuthorities() throws Exception {
-        mockMvc.perform(get("/api/v1/roles").header("Authorization", "Bearer " + tokenFor("role:read")))
+    void aTokenAuthorisesByItsAuthorities() throws Exception {
+        mockMvc.perform(get("/api/v1/judge-servers").header("Authorization", "Bearer " + tokenFor("judgeserver:read")))
                 .andExpect(status().isOk());
     }
 
     @Test
-    void aFreshTokenWithoutThePermissionIsForbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/roles").header("Authorization", "Bearer " + tokenFor("problem:create")))
+    void aTokenWithoutThePermissionIsForbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/judge-servers").header("Authorization", "Bearer " + tokenFor("problem:create")))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void anOldFormatTokenIsAnonymous_401OnProtected_200OnPublic() throws Exception {
-        String old = oldFormatToken(new Date(System.currentTimeMillis() + 600_000));
+        String old = oldFormatToken(Instant.now().plusSeconds(600));
 
-        mockMvc.perform(get("/api/v1/roles").header("Authorization", "Bearer " + old))
+        mockMvc.perform(get("/api/v1/judge-servers").header("Authorization", "Bearer " + old))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/v1/languages").header("Authorization", "Bearer " + old))
                 .andExpect(status().isOk());
@@ -116,16 +117,9 @@ class OjJwtWiringTest {
     @Test
     void anExpiredTokenLeftInTheCookieDoesNotBlockPublicEndpoints() throws Exception {
         // The cookie's age is fixed (1 day) while the token lifetime is configuration: it can ride expired.
-        String expired = oldFormatToken(new Date(System.currentTimeMillis() - 3_600_000));
+        String expired = oldFormatToken(Instant.now().minusSeconds(3600));
 
         mockMvc.perform(get("/api/v1/languages").cookie(new Cookie("accessToken", expired)))
                 .andExpect(status().isOk());
-    }
-
-    @Test
-    void theJwksEndpointIsPublic() throws Exception {
-        mockMvc.perform(get("/.well-known/jwks.json"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.keys[0].kid").value(jwtUtil.getKeyId()));
     }
 }

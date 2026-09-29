@@ -20,7 +20,6 @@ import vn.thanhtuanle.common.payload.PageResponse;
 import vn.thanhtuanle.entity.Language;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
-import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedAppEvent;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
@@ -30,9 +29,7 @@ import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 import vn.thanhtuanle.problem.ProblemRepository;
 import vn.thanhtuanle.language.LanguageRepository;
-import vn.thanhtuanle.security.SubmissionRateLimiter;
 
-import vn.thanhtuanle.user.UserService;
 
 import java.util.UUID;
 
@@ -46,7 +43,6 @@ public class SubmissionService {
     private final ProblemRepository problemRepository;
     private final LanguageRepository languageRepository;
     private final SubmissionMapper submissionMapper;
-    private final UserService userService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final SubmissionSseRegistry sseRegistry;
     private final SubmissionDetailAssembler detailAssembler;
@@ -70,7 +66,7 @@ public class SubmissionService {
         // and before the row exists so a throttled submit leaves no trace.
         submissionRateLimiter.acquire(userId);
 
-        Submission submission = createPendingSubmission(req, problem, language, userService.getReference(userId));
+        Submission submission = createPendingSubmission(req, problem, language, userId);
         submissionRepository.save(submission);
         MDC.put("submissionId", submission.getId().toString());
         try {
@@ -85,11 +81,11 @@ public class SubmissionService {
     }
 
     private Submission createPendingSubmission(SubmissionRequestDto req, Problem problem, Language language,
-            User user) {
+            UUID userId) {
         return Submission.builder()
                 .sourceCode(req.getSourceCode())
                 .problem(problem)
-                .user(user)
+                .userId(userId)
                 .language(language)
                 .time(0)
                 .memory(0L)
@@ -201,8 +197,7 @@ public class SubmissionService {
      */
     private void assertCanRead(Submission submission, String id) {
         UUID current = currentUser.id();
-        boolean isOwner = submission.getUser() != null
-                && submission.getUser().getId().equals(current);
+        boolean isOwner = current.equals(submission.getUserId());
         if (isOwner || hasReadAnyAuthority()) {
             return;
         }

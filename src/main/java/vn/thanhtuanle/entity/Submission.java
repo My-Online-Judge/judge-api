@@ -14,6 +14,7 @@ import vn.thanhtuanle.judge.dto.JudgeResultDto;
 import lombok.experimental.SuperBuilder;
 
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "t_submissions")
@@ -50,9 +51,10 @@ public class Submission extends BaseEntity {
     @JoinColumn(name = "language_id", referencedColumnName = "id", nullable = false)
     private Language language;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
-    private User user;
+    // The submitter. Users live in identity-service's database, so this is a plain id, not a
+    // relationship (V15 dropped the foreign key to the old t_users).
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
     // Raw per-testcase results from the judge, stored verbatim. Read ONLY through
     // SubmissionDetailAssembler — it carries hidden test data that must be filtered.

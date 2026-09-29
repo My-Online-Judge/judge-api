@@ -13,14 +13,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.entity.Submission;
-import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
 import vn.thanhtuanle.problem.ProblemRepository;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 import vn.thanhtuanle.oj.common.security.CurrentUser;
-import vn.thanhtuanle.user.UserService;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -39,7 +37,6 @@ class SubmissionServiceStreamTest {
     @Mock ProblemRepository problemRepository;
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
-    @Mock UserService userService;
     @Mock CurrentUser currentUser;
     @Mock ApplicationEventPublisher applicationEventPublisher;
     @Mock SubmissionSseRegistry sseRegistry;
@@ -51,18 +48,17 @@ class SubmissionServiceStreamTest {
     @Test
     void streamVerdict_loadsAndAuthorizesBeforeSubscribing_thenReplaysTerminalVerdict() {
         UUID id = UUID.randomUUID();
-        User owner = new User();
-        owner.setId(UUID.randomUUID());
+        UUID ownerId = UUID.randomUUID();
         Submission s = new Submission();
         s.setId(id);
-        s.setUser(owner);
+        s.setUserId(ownerId);
         s.setStatus(SubmissionResult.ACCEPTED.getValue());
         SubmissionResponseDto dto = SubmissionResponseDto.builder()
                 .status(SubmissionResult.ACCEPTED.getValue()).build();
         SseEmitter emitter = new SseEmitter();
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.ACCEPTED.getValue());
-        when(currentUser.id()).thenReturn(owner.getId());
+        when(currentUser.id()).thenReturn(ownerId);
         when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
         when(submissionMapper.toDto(eq(s), any())).thenReturn(dto);
 
@@ -84,15 +80,14 @@ class SubmissionServiceStreamTest {
     @Test
     void streamVerdict_whenPending_doesNotReplay() {
         UUID id = UUID.randomUUID();
-        User owner = new User();
-        owner.setId(UUID.randomUUID());
+        UUID ownerId = UUID.randomUUID();
         Submission s = new Submission();
         s.setId(id);
-        s.setUser(owner);
+        s.setUserId(ownerId);
         s.setStatus(SubmissionResult.PENDING.getValue());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.PENDING.getValue());
-        when(currentUser.id()).thenReturn(owner.getId());
+        when(currentUser.id()).thenReturn(ownerId);
         when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
 
         submissionService.streamVerdict(id.toString());
@@ -105,15 +100,14 @@ class SubmissionServiceStreamTest {
     @Test
     void streamVerdict_whenJudging_doesNotReplay() {
         UUID id = UUID.randomUUID();
-        User owner = new User();
-        owner.setId(UUID.randomUUID());
+        UUID ownerId = UUID.randomUUID();
         Submission s = new Submission();
         s.setId(id);
-        s.setUser(owner);
+        s.setUserId(ownerId);
         s.setStatus(SubmissionResult.JUDGING.getValue());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         when(submissionRepository.findStatusById(id)).thenReturn(SubmissionResult.JUDGING.getValue());
-        when(currentUser.id()).thenReturn(owner.getId());
+        when(currentUser.id()).thenReturn(ownerId);
         when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
 
         submissionService.streamVerdict(id.toString());
@@ -131,14 +125,13 @@ class SubmissionServiceStreamTest {
         // scalar status query (always hits the DB), and the entity must then be refresh()ed
         // before mapping the replay payload.
         UUID id = UUID.randomUUID();
-        User owner = new User();
-        owner.setId(UUID.randomUUID());
+        UUID ownerId = UUID.randomUUID();
 
         // The one managed instance: PENDING when loaded for authorization, and — exactly like
         // the L1 cache — still PENDING if findById were asked again.
         Submission managed = new Submission();
         managed.setId(id);
-        managed.setUser(owner);
+        managed.setUserId(ownerId);
         managed.setStatus(SubmissionResult.PENDING.getValue());
 
         SubmissionResponseDto dto = SubmissionResponseDto.builder()
@@ -153,7 +146,7 @@ class SubmissionServiceStreamTest {
             managed.setStatus(SubmissionResult.ACCEPTED.getValue());
             return null;
         }).when(entityManager).refresh(managed);
-        when(currentUser.id()).thenReturn(owner.getId());
+        when(currentUser.id()).thenReturn(ownerId);
         when(sseRegistry.subscribe(id.toString())).thenReturn(emitter);
         when(submissionMapper.toDto(eq(managed), any())).thenReturn(dto);
 
@@ -169,15 +162,14 @@ class SubmissionServiceStreamTest {
         // Row deleted between load and re-read: null scalar means no replay decision can be
         // made — leave the emitter to the registry timeout, no special-casing.
         UUID id = UUID.randomUUID();
-        User owner = new User();
-        owner.setId(UUID.randomUUID());
+        UUID ownerId = UUID.randomUUID();
         Submission s = new Submission();
         s.setId(id);
-        s.setUser(owner);
+        s.setUserId(ownerId);
         s.setStatus(SubmissionResult.PENDING.getValue());
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         when(submissionRepository.findStatusById(id)).thenReturn(null);
-        when(currentUser.id()).thenReturn(owner.getId());
+        when(currentUser.id()).thenReturn(ownerId);
         when(sseRegistry.subscribe(id.toString())).thenReturn(new SseEmitter());
 
         submissionService.streamVerdict(id.toString());

@@ -8,12 +8,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
-import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.dto.TestCaseResultDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 import vn.thanhtuanle.oj.common.security.CurrentUser;
-import vn.thanhtuanle.user.UserService;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,19 +28,17 @@ class SubmissionServiceDetailsTest {
     @Mock SubmissionRepository submissionRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock SubmissionDetailAssembler detailAssembler;
-    @Mock UserService userService;
     @Mock CurrentUser currentUser;
     @InjectMocks SubmissionService service;
 
     @Test
     void getById_populatesDetailsFromAssembler() {
         UUID id = UUID.randomUUID();
-        User owner = new User();
-        owner.setId(UUID.randomUUID());
-        Submission s = Submission.builder().problem(new Problem()).user(owner).build();
+        UUID ownerId = UUID.randomUUID();
+        Submission s = Submission.builder().problem(new Problem()).userId(ownerId).build();
         s.setId(id);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
-        when(currentUser.id()).thenReturn(owner.getId());
+        when(currentUser.id()).thenReturn(ownerId);
 
         List<TestCaseResultDto> rows = List.of(
                 TestCaseResultDto.builder().name("1").result(0).build());

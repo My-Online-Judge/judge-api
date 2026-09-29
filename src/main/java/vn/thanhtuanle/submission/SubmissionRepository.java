@@ -42,7 +42,7 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
     @Query("""
                 SELECT s
                 FROM Submission s
-                WHERE s.user.id = :userId
+                WHERE s.userId = :userId
                 ORDER BY s.createdAt DESC
             """)
     Page<Submission> findByUserIdOrderByCreatedAtDesc(
@@ -53,7 +53,7 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
     @Query("""
                 SELECT s
                 FROM Submission s
-                WHERE s.user.id = :userId AND s.problem.problemSlug = :problemSlug
+                WHERE s.userId = :userId AND s.problem.problemSlug = :problemSlug
                 ORDER BY s.createdAt DESC
             """)
     Page<Submission> findByUserIdAndProblemSlugOrderByCreatedAtDesc(

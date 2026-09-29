@@ -15,17 +15,14 @@ import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.entity.Language;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
-import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
 import vn.thanhtuanle.problem.ProblemRepository;
-import vn.thanhtuanle.security.SubmissionRateLimiter;
 import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 import vn.thanhtuanle.oj.common.security.CurrentUser;
-import vn.thanhtuanle.user.UserService;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -48,7 +45,6 @@ class SubmissionServiceCooldownTest {
     @Mock ProblemRepository problemRepository;
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
-    @Mock UserService userService;
     @Mock CurrentUser currentUser;
     @Mock ApplicationEventPublisher applicationEventPublisher;
     @Mock SubmissionSseRegistry sseRegistry;
@@ -66,12 +62,9 @@ class SubmissionServiceCooldownTest {
         req.setLanguageIdentifier("python3");
         req.setProblemSlug("simple-a-plus-b");
 
-        User user = User.builder().username("u").build();
-        user.setId(userId);
         when(problemRepository.findByProblemSlug("simple-a-plus-b")).thenReturn(Optional.of(new Problem()));
         when(languageRepository.findByIdentifier("python3")).thenReturn(Optional.of(new Language()));
         when(currentUser.id()).thenReturn(userId);
-        when(userService.getReference(userId)).thenReturn(user);
         when(submissionRepository.save(any())).thenAnswer(inv -> {
             Submission s = inv.getArgument(0);
             s.setId(UUID.randomUUID());

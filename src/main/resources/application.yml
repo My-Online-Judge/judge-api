@@ -84,9 +84,9 @@ judge:
 oj:
   security:
     jwt:
-      # judge-api verifies its own tokens through its JWKS for now; sub-project 1b points this at
-      # identity-service. Fetched lazily, on the first request that carries a token.
-      jwks-uri: ${OJ_JWKS_URI:http://localhost:${server.port}/.well-known/jwks.json}
+      # identity-service issues the access tokens and publishes their public key; fetched lazily, on
+      # the first request that carries a token.
+      jwks-uri: ${OJ_JWKS_URI:http://identity-service:8000/.well-known/jwks.json}
   submission:
     cooldown-seconds: ${SUBMISSION_COOLDOWN_SECONDS:10}
 

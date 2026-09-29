@@ -10,11 +10,9 @@ import org.springframework.data.domain.Page;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
-import vn.thanhtuanle.entity.User;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 import vn.thanhtuanle.oj.common.security.CurrentUser;
-import vn.thanhtuanle.user.UserService;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -34,19 +32,12 @@ class SubmissionServiceAuthorizationTest {
     @Mock SubmissionRepository submissionRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock SubmissionDetailAssembler detailAssembler;
-    @Mock UserService userService;
     @Mock CurrentUser currentUser;
     @Mock SubmissionSseRegistry sseRegistry;
     @InjectMocks SubmissionService service;
 
-    private User user(UUID id) {
-        User u = new User();
-        u.setId(id);
-        return u;
-    }
-
-    private Submission ownedBy(UUID submissionId, User owner) {
-        Submission s = Submission.builder().problem(new Problem()).user(owner).build();
+    private Submission ownedBy(UUID submissionId, UUID ownerId) {
+        Submission s = Submission.builder().problem(new Problem()).userId(ownerId).build();
         s.setId(submissionId);
         return s;
     }
@@ -55,11 +46,10 @@ class SubmissionServiceAuthorizationTest {
     void owner_canRead() {
         UUID ownerId = UUID.randomUUID();
         UUID subId = UUID.randomUUID();
-        User owner = user(ownerId);
-        Submission s = ownedBy(subId, owner);
+        Submission s = ownedBy(subId, ownerId);
 
         when(submissionRepository.findById(subId)).thenReturn(Optional.of(s));
-        when(currentUser.id()).thenReturn(owner.getId());
+        when(currentUser.id()).thenReturn(ownerId);
         when(submissionMapper.toDto(eq(s), any()))
                 .thenReturn(SubmissionResponseDto.builder().build());
 
@@ -69,7 +59,7 @@ class SubmissionServiceAuthorizationTest {
     @Test
     void nonOwner_gets404NotForbidden() {
         UUID subId = UUID.randomUUID();
-        Submission s = ownedBy(subId, user(UUID.randomUUID()));
+        Submission s = ownedBy(subId, UUID.randomUUID());
 
         when(submissionRepository.findById(subId)).thenReturn(Optional.of(s));
         when(currentUser.id()).thenReturn(UUID.randomUUID());
@@ -81,7 +71,7 @@ class SubmissionServiceAuthorizationTest {
     @Test
     void streamVerdict_nonOwnerWithoutReadAny_deniedAndRegistryNeverTouched() {
         UUID subId = UUID.randomUUID();
-        Submission s = ownedBy(subId, user(UUID.randomUUID()));
+        Submission s = ownedBy(subId, UUID.randomUUID());
 
         when(submissionRepository.findById(subId)).thenReturn(Optional.of(s));
         when(currentUser.id()).thenReturn(UUID.randomUUID());

@@ -1,4 +1,4 @@
-package vn.thanhtuanle.security;
+package vn.thanhtuanle.submission;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;

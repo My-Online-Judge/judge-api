@@ -10,8 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import vn.thanhtuanle.security.LoginRateLimiter;
-import vn.thanhtuanle.security.SubmissionRateLimiter;
+import vn.thanhtuanle.submission.SubmissionRateLimiter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,13 +36,6 @@ class MetricPreRegistrationTest {
     @BeforeEach
     void setUp() {
         registry = new SimpleMeterRegistry();
-    }
-
-    @Test
-    void loginRateLimiterHoldsItsCounter() {
-        new LoginRateLimiter(redis, registry);
-
-        assertThat(registry.find("oj.login.rate_limited").counter()).isNotNull();
     }
 
     @Test
