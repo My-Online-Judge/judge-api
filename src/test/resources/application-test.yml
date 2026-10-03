@@ -28,3 +28,7 @@ openapi:
     server: ${BACKEND_SERVICE:http://localhost:${server.port}}
     title: Backend service
     version: 1.0.0
+oj:
+  outbox:
+    # Tests drive OutboxRelay directly; no background dispatch against the H2 database.
+    relay-enabled: false
