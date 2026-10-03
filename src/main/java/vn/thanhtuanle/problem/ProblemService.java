@@ -18,7 +18,6 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.common.exception.ResourceAlreadyExistException;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.common.util.FileUtil;
-import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.TestCase;
 import vn.thanhtuanle.problem.dto.CreateProblemDto;
@@ -27,6 +26,8 @@ import vn.thanhtuanle.problem.dto.ProblemResponseDto;
 import vn.thanhtuanle.problem.dto.ProblemStatisticProjection;
 import vn.thanhtuanle.problem.dto.ProblemStatisticsInfo;
 import vn.thanhtuanle.problem.mapper.ProblemMapper;
+import vn.thanhtuanle.testcase.TestCaseBundlePublisher;
+import vn.thanhtuanle.testcase.TestCaseSourceStore;
 
 import java.io.File;
 import java.io.IOException;
@@ -48,8 +49,8 @@ public class ProblemService {
 
     private final ProblemRepository problemRepository;
     private final ProblemMapper problemMapper;
-    private final GenerateTestCaseInfoUtil infoGenerator;
-    private final vn.thanhtuanle.testcase.TestCaseBundleStore bundleStore;
+    private final TestCaseSourceStore sources;
+    private final TestCaseBundlePublisher publisher;
 
     @Transactional
     public ProblemResponseDto createProblem(CreateProblemDto dto, MultipartFile zipFile) throws IOException {
@@ -60,19 +61,14 @@ public class ProblemService {
         Problem problem = problemMapper.toEntity(dto);
         problem.setTestCases(new ArrayList<>());
 
-        String destDirPath = String.format("%s/%s", AppProperties.TEST_CASE_DIR, dto.getProblemSlug());
-
         // Process files
-        processTestCases(zipFile, problem, destDirPath);
-
-        // Run async to generate info file
-        infoGenerator.generateInfo(dto.getProblemSlug().trim());
+        processTestCases(zipFile, problem);
 
         // Sort test cases by name
         problem.getTestCases().sort(Comparator.comparing(TestCase::getInput));
 
         Problem savedProblem = problemRepository.save(problem);
-        bundleStore.publish(dto.getProblemSlug().trim());
+        publisher.publish(savedProblem);
         log.info("Problem created successfully with ID: {}", savedProblem.getId());
         return problemMapper.toDto(savedProblem);
     }
@@ -89,7 +85,7 @@ public class ProblemService {
         }
     }
 
-    private void processTestCases(MultipartFile zipFile, Problem problem, String destDirPath) throws IOException {
+    private void processTestCases(MultipartFile zipFile, Problem problem) throws IOException {
         // Extract zip to memory
         log.info("Extracting zip file for problem: {}", problem.getProblemSlug());
         Map<String, byte[]> extractedFiles = FileUtil.extractZip(zipFile);
@@ -108,11 +104,11 @@ public class ProblemService {
         });
 
         log.info("Validating and processing test case files for problem: {}", problem.getProblemSlug());
-        matchAndSaveTestCases(inputFiles, outputFiles, problem, destDirPath);
+        matchAndSaveTestCases(inputFiles, outputFiles, problem);
     }
 
-    private void matchAndSaveTestCases(Map<String, byte[]> inputFiles, Map<String, byte[]> outputFiles, Problem problem,
-            String destDirPath) {
+    private void matchAndSaveTestCases(Map<String, byte[]> inputFiles, Map<String, byte[]> outputFiles,
+            Problem problem) {
         inputFiles.forEach((inName, inContent) -> {
             String baseName = inName.substring(0, inName.length() - AppProperties.INPUT_FILE_EXTENSION.length());
             String outName = baseName + AppProperties.OUTPUT_FILE_EXTENSION;
@@ -121,23 +117,17 @@ public class ProblemService {
                 log.info("Found valid test case pair: {} - {}", inName, outName);
                 byte[] outContent = outputFiles.get(outName);
 
-                try {
-                    String inputFileName = new File(inName).getName();
-                    String outputFileName = new File(outName).getName();
+                String inputPath = String.format("%s/%s", problem.getProblemSlug(), new File(inName).getName());
+                String outputPath = String.format("%s/%s", problem.getProblemSlug(), new File(outName).getName());
+                sources.put(inputPath, inContent);
+                sources.put(outputPath, outContent);
 
-                    FileUtil.saveFile(inContent, String.format("%s/%s", destDirPath, inputFileName));
-                    FileUtil.saveFile(outContent, String.format("%s/%s", destDirPath, outputFileName));
-
-                    TestCase testCase = TestCase.builder()
-                            .input(String.format("%s/%s", problem.getProblemSlug(), inputFileName))
-                            .output(String.format("%s/%s", problem.getProblemSlug(), outputFileName))
-                            .problem(problem)
-                            .build();
-                    problem.getTestCases().add(testCase);
-                } catch (IOException e) {
-                    log.error("Failed to save test case file: {}", inName, e);
-                    throw new RuntimeException("Failed to save test case", e);
-                }
+                TestCase testCase = TestCase.builder()
+                        .input(inputPath)
+                        .output(outputPath)
+                        .problem(problem)
+                        .build();
+                problem.getTestCases().add(testCase);
             }
         });
     }

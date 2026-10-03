@@ -6,7 +6,6 @@ import io.minio.errors.ErrorResponseException;
 import io.minio.messages.ErrorResponse;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,7 +30,7 @@ class TestCaseBundleStoreObjectExistsTest {
         when(ex.errorResponse()).thenReturn(er);
         when(client.statObject(any(StatObjectArgs.class))).thenThrow(ex);
 
-        TestCaseBundleStore store = new TestCaseBundleStore(client, props(), Paths.get("/tmp"));
+        TestCaseBundleStore store = new TestCaseBundleStore(client, props());
         assertThat(store.hasBundle("some-slug")).isFalse();
     }
 
@@ -44,7 +43,7 @@ class TestCaseBundleStoreObjectExistsTest {
         when(ex.errorResponse()).thenReturn(er);
         when(client.statObject(any(StatObjectArgs.class))).thenThrow(ex);
 
-        TestCaseBundleStore store = new TestCaseBundleStore(client, props(), Paths.get("/tmp"));
+        TestCaseBundleStore store = new TestCaseBundleStore(client, props());
         assertThatThrownBy(() -> store.hasBundle("some-slug"))
                 .isInstanceOf(TestCaseBundleException.class);
     }

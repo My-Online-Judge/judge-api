@@ -8,11 +8,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import vn.thanhtuanle.common.enums.ProblemStatus;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
-import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.TestCase;
 import vn.thanhtuanle.problem.dto.TestCaseResponse;
-import vn.thanhtuanle.testcase.TestCaseBundleStore;
+import vn.thanhtuanle.testcase.TestCaseBundlePublisher;
+import vn.thanhtuanle.testcase.TestCaseSourceStore;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -26,8 +26,8 @@ class TestCaseServiceSampleToggleTest {
 
     @Mock ProblemRepository problemRepository;
     @Mock TestCaseRepository testCaseRepository;
-    @Mock GenerateTestCaseInfoUtil infoGenerator;
-    @Mock TestCaseBundleStore bundleStore;
+    @Mock TestCaseSourceStore sources;
+    @Mock TestCaseBundlePublisher publisher;
     @InjectMocks TestCaseService service;
 
     @Test
@@ -46,8 +46,7 @@ class TestCaseServiceSampleToggleTest {
         assertThat(response.getId()).isEqualTo(id);
         assertThat(response.isSample()).isTrue();
         // The bundle hash must not change: no re-judge churn from a visibility toggle.
-        verifyNoInteractions(bundleStore);
-        verifyNoInteractions(infoGenerator);
+        verifyNoInteractions(publisher);
     }
 
     @Test
@@ -64,8 +63,7 @@ class TestCaseServiceSampleToggleTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(testCaseRepository, never()).save(any());
-        verifyNoInteractions(bundleStore);
-        verifyNoInteractions(infoGenerator);
+        verifyNoInteractions(publisher);
     }
 
     @Test
@@ -79,8 +77,7 @@ class TestCaseServiceSampleToggleTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(testCaseRepository, never()).save(any());
-        verifyNoInteractions(bundleStore);
-        verifyNoInteractions(infoGenerator);
+        verifyNoInteractions(publisher);
     }
 
     @Test

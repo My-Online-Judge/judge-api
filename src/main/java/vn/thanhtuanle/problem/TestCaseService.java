@@ -9,17 +9,17 @@ import org.springframework.web.multipart.MultipartFile;
 import vn.thanhtuanle.common.constant.AppProperties;
 import vn.thanhtuanle.common.enums.ProblemStatus;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
+import vn.thanhtuanle.common.util.AfterCommit;
 import vn.thanhtuanle.common.util.FileUtil;
-import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
 import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.TestCase;
 import vn.thanhtuanle.problem.dto.TestCaseContext;
 import vn.thanhtuanle.problem.dto.TestCaseResponse;
+import vn.thanhtuanle.testcase.TestCaseBundlePublisher;
+import vn.thanhtuanle.testcase.TestCaseSourceStore;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -30,10 +30,10 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Manages a problem's test cases after creation (list / add / import / delete). Files live under
- * {@code TEST_CASE_DIR/{slug}/} and are named with the next integer index so the judge (which
- * sorts {@code .in} files numerically) keeps a stable order. After every mutation the problem's
- * info file is regenerated.
+ * Manages a problem's test cases after creation (list / add / import / delete). Files are kept in the
+ * {@link TestCaseSourceStore} under {@code {slug}/{index}.in|out}, named with the next integer index so
+ * the judge (which sorts {@code .in} files numerically) keeps a stable order. After every change to the
+ * set of test cases the problem's bundle is rebuilt from the rows and republished.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,8 +42,8 @@ public class TestCaseService {
 
     private final ProblemRepository problemRepository;
     private final TestCaseRepository testCaseRepository;
-    private final GenerateTestCaseInfoUtil infoGenerator;
-    private final vn.thanhtuanle.testcase.TestCaseBundleStore bundleStore;
+    private final TestCaseSourceStore sources;
+    private final TestCaseBundlePublisher publisher;
 
     private static final Comparator<TestCaseResponse> BY_NUMERIC_NAME =
             Comparator.comparingInt(r -> parseIntOrMax(r.getName()));
@@ -94,8 +94,7 @@ public class TestCaseService {
         TestCase created = persistTestCase(problem, slug, index, inBytes, outBytes);
 
         problemRepository.save(problem);
-        infoGenerator.generateInfo(slug);
-        bundleStore.publish(slug);
+        publisher.publish(problem);
 
         log.info("End add test case for problem: {} as index {}", slug, index);
         return toResponse(created, inBytes, outBytes);
@@ -142,8 +141,7 @@ public class TestCaseService {
         }
 
         problemRepository.save(problem);
-        infoGenerator.generateInfo(slug);
-        bundleStore.publish(slug);
+        publisher.publish(problem);
 
         List<TestCaseResponse> responses = new ArrayList<>();
         for (int i = 0; i < newCases.size(); i++) {
@@ -157,18 +155,26 @@ public class TestCaseService {
     public void deleteTestCase(String slug, UUID testCaseId) {
         log.info("Start delete test case {} for problem: {}", testCaseId, slug);
         TestCase tc = getOwnedTestCaseOrThrow(slug, testCaseId);
+        Problem problem = tc.getProblem();
+        if (problem.getTestCases().size() <= 1) {
+            // A bundle needs at least one test case; replace the last one by adding first, then deleting.
+            throw new IllegalArgumentException("A problem needs at least one test case: add another before deleting this one");
+        }
 
-        deleteFileQuietly(tc.getInput());
-        deleteFileQuietly(tc.getOutput());
+        problem.getTestCases().remove(tc);
         testCaseRepository.delete(tc);
-        infoGenerator.generateInfo(slug);
-        bundleStore.publish(slug);
+        publisher.publish(problem);
+        // Only after the commit: if the transaction rolls back, the row still needs its files.
+        AfterCommit.run(() -> {
+            sources.deleteQuietly(tc.getInput());
+            sources.deleteQuietly(tc.getOutput());
+        });
         log.info("End delete test case {} for problem: {}", testCaseId, slug);
     }
 
     /**
      * Toggle whether a test case's input/output may be shown to users. Deliberately does NOT
-     * regenerate the info file or republish the bundle — visibility is database-only metadata,
+     * republish the bundle — visibility is database-only metadata,
      * and changing the bundle hash would force a needless re-judge.
      */
     @Transactional
@@ -184,13 +190,12 @@ public class TestCaseService {
 
     // --- persistence / IO helpers -------------------------------------------------------------
 
-    private TestCase persistTestCase(Problem problem, String slug, int index, byte[] inBytes, byte[] outBytes)
-            throws IOException {
+    private TestCase persistTestCase(Problem problem, String slug, int index, byte[] inBytes, byte[] outBytes) {
         String inRelative = relativePath(slug, index, AppProperties.INPUT_FILE_EXTENSION);
         String outRelative = relativePath(slug, index, AppProperties.OUTPUT_FILE_EXTENSION);
 
-        FileUtil.saveFile(inBytes, String.format("%s/%s", AppProperties.TEST_CASE_DIR, inRelative));
-        FileUtil.saveFile(outBytes, String.format("%s/%s", AppProperties.TEST_CASE_DIR, outRelative));
+        sources.put(inRelative, inBytes);
+        sources.put(outRelative, outBytes);
 
         TestCase testCase = TestCase.builder()
                 .input(inRelative)
@@ -233,18 +238,15 @@ public class TestCaseService {
 
     private String readContentQuietly(String relativePath) {
         try {
-            return Files.readString(Paths.get(AppProperties.TEST_CASE_DIR, relativePath));
-        } catch (IOException e) {
-            log.warn("Test case file not readable, returning empty content: {}", relativePath);
+            return sources.get(relativePath)
+                    .map(bytes -> new String(bytes, StandardCharsets.UTF_8))
+                    .orElseGet(() -> {
+                        log.warn("Test case file not stored, returning empty content: {}", relativePath);
+                        return "";
+                    });
+        } catch (RuntimeException e) {
+            log.warn("Test case file not readable, returning empty content: {}", relativePath, e);
             return "";
-        }
-    }
-
-    private void deleteFileQuietly(String relativePath) {
-        try {
-            Files.deleteIfExists(Paths.get(AppProperties.TEST_CASE_DIR, relativePath));
-        } catch (IOException e) {
-            log.warn("Failed to delete test case file: {}", relativePath, e);
         }
     }
 

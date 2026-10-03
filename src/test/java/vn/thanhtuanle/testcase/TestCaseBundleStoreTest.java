@@ -8,7 +8,6 @@ import io.minio.StatObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import okhttp3.Headers;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -16,8 +15,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,32 +38,32 @@ class TestCaseBundleStoreTest {
         return p;
     }
 
-    private Path problemDir(Path base, String slug) throws Exception {
-        Path dir = base.resolve(slug);
-        Files.createDirectories(dir);
-        Files.writeString(dir.resolve("1.in"), "1 2\n");
-        Files.writeString(dir.resolve("1.out"), "3\n");
-        Files.writeString(dir.resolve("info"), "{\"test_case_number\":1}");
-        return dir;
+    private static List<BundleFile> files() {
+        return List.of(
+                new BundleFile("1.in", "1 2\n".getBytes(StandardCharsets.UTF_8)),
+                new BundleFile("1.out", "3\n".getBytes(StandardCharsets.UTF_8)),
+                new BundleFile("info", "{\"test_case_number\":1}".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
-    void contentHash_isStableAndTwelveHex(@TempDir Path base) throws Exception {
-        Path dir = problemDir(base, "p");
-        String h1 = TestCaseBundleStore.contentHash(TestCaseBundleStore.listBundleFiles(dir));
-        String h2 = TestCaseBundleStore.contentHash(TestCaseBundleStore.listBundleFiles(dir));
+    void contentHash_isStableTwelveHexAndIndependentOfInputOrder() {
+        List<BundleFile> reversed = new ArrayList<>(files());
+        Collections.reverse(reversed);
+
+        String h1 = TestCaseBundleStore.contentHash(BundleFile.sortedByName(files()));
+        String h2 = TestCaseBundleStore.contentHash(BundleFile.sortedByName(reversed));
+
         assertThat(h1).isEqualTo(h2).hasSize(12).matches("[0-9a-f]{12}");
     }
 
     @Test
-    void publish_uploadsBundleAndPointsCurrentAtTheHash(@TempDir Path base) throws Exception {
-        problemDir(base, "p");
+    void publish_uploadsBundleAndPointsCurrentAtTheHash() throws Exception {
         // statObject throws NoSuchKey -> object absent -> bundle gets uploaded.
         when(minio.statObject(any(StatObjectArgs.class)))
                 .thenThrow(noSuchKey());
-        TestCaseBundleStore store = new TestCaseBundleStore(minio, props(), base);
+        TestCaseBundleStore store = new TestCaseBundleStore(minio, props());
 
-        String hash = store.publish("p");
+        String hash = store.publish("p", files());
 
         ArgumentCaptor<PutObjectArgs> puts = ArgumentCaptor.forClass(PutObjectArgs.class);
         verify(minio, org.mockito.Mockito.times(2)).putObject(puts.capture());
@@ -73,12 +72,11 @@ class TestCaseBundleStoreTest {
     }
 
     @Test
-    void publish_skipsUploadWhenBundleAlreadyExists(@TempDir Path base) throws Exception {
-        problemDir(base, "p");
+    void publish_skipsUploadWhenBundleAlreadyExists() throws Exception {
         when(minio.statObject(any(StatObjectArgs.class))).thenReturn(null); // present
-        TestCaseBundleStore store = new TestCaseBundleStore(minio, props(), base);
+        TestCaseBundleStore store = new TestCaseBundleStore(minio, props());
 
-        store.publish("p");
+        store.publish("p", files());
 
         // Only CURRENT is (re)written; the immutable bundle upload is skipped.
         ArgumentCaptor<PutObjectArgs> puts = ArgumentCaptor.forClass(PutObjectArgs.class);
@@ -87,29 +85,28 @@ class TestCaseBundleStoreTest {
     }
 
     @Test
-    void publish_throwsWhenNoTestCaseFiles(@TempDir Path base) throws Exception {
-        Files.createDirectories(base.resolve("empty"));
-        TestCaseBundleStore store = new TestCaseBundleStore(minio, props(), base);
-        assertThatThrownBy(() -> store.publish("empty"))
+    void publish_throwsWhenNoTestCaseFiles() throws Exception {
+        TestCaseBundleStore store = new TestCaseBundleStore(minio, props());
+        assertThatThrownBy(() -> store.publish("empty", List.of()))
                 .isInstanceOf(TestCaseBundleException.class);
         verify(minio, never()).putObject(any());
     }
 
     @Test
-    void currentVersion_readsThePointerObject(@TempDir Path base) throws Exception {
+    void currentVersion_readsThePointerObject() throws Exception {
         GetObjectResponse resp = new GetObjectResponse(
                 Headers.of(), "test-cases", null, "p/CURRENT",
                 new ByteArrayInputStream("deadbeef1234".getBytes(StandardCharsets.UTF_8)));
         when(minio.getObject(any(GetObjectArgs.class))).thenReturn(resp);
-        TestCaseBundleStore store = new TestCaseBundleStore(minio, props(), base);
+        TestCaseBundleStore store = new TestCaseBundleStore(minio, props());
 
         assertThat(store.currentVersion("p")).isEqualTo("deadbeef1234");
     }
 
     @Test
-    void currentVersion_throwsWhenAbsent(@TempDir Path base) throws Exception {
+    void currentVersion_throwsWhenAbsent() throws Exception {
         when(minio.getObject(any(GetObjectArgs.class))).thenThrow(noSuchKey());
-        TestCaseBundleStore store = new TestCaseBundleStore(minio, props(), base);
+        TestCaseBundleStore store = new TestCaseBundleStore(minio, props());
         assertThatThrownBy(() -> store.currentVersion("p"))
                 .isInstanceOf(TestCaseBundleException.class);
     }

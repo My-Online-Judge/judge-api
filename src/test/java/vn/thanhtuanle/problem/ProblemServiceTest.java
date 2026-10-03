@@ -12,7 +12,6 @@ import org.springframework.data.domain.Pageable;
 
 import vn.thanhtuanle.common.enums.ProblemStatus;
 import vn.thanhtuanle.common.payload.PageResponse;
-import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
 import vn.thanhtuanle.problem.dto.ProblemResponseDto;
 import vn.thanhtuanle.problem.dto.ProblemStatisticProjection;
 import vn.thanhtuanle.problem.dto.ProblemTagRow;
@@ -39,8 +38,6 @@ class ProblemServiceTest {
     private ProblemRepository problemRepository;
     @Mock
     private ProblemMapper problemMapper;
-    @Mock
-    private GenerateTestCaseInfoUtil infoGenerator;
 
     @InjectMocks
     private ProblemService problemService;

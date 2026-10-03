@@ -7,7 +7,6 @@ import io.minio.Result;
 import io.minio.messages.Item;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Paths;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -45,7 +44,7 @@ class TestCaseBundleStorePruneTest {
         when(client.listObjects(any(ListObjectsArgs.class)))
                 .thenReturn(List.of(new Result<>(recent), new Result<>(cur), new Result<>(old)));
 
-        TestCaseBundleStore store = new TestCaseBundleStore(client, props(2), Paths.get("/tmp"));
+        TestCaseBundleStore store = new TestCaseBundleStore(client, props(2));
         store.pruneOldBundles("simple", "cur");
 
         verify(client).removeObject(argThat(a -> a.object().equals("simple/old.zip")));
@@ -62,7 +61,7 @@ class TestCaseBundleStorePruneTest {
         when(client.listObjects(any(ListObjectsArgs.class)))
                 .thenReturn(List.of(new Result<>(newest), new Result<>(mid), new Result<>(cur)));
 
-        TestCaseBundleStore store = new TestCaseBundleStore(client, props(2), Paths.get("/tmp"));
+        TestCaseBundleStore store = new TestCaseBundleStore(client, props(2));
         store.pruneOldBundles("simple", "cur");
 
         verify(client).removeObject(argThat(a -> a.object().equals("simple/mid.zip")));
@@ -77,7 +76,7 @@ class TestCaseBundleStorePruneTest {
         when(client.listObjects(any(ListObjectsArgs.class)))
                 .thenReturn(List.of(new Result<>(cur), new Result<>(one)));
 
-        TestCaseBundleStore store = new TestCaseBundleStore(client, props(3), Paths.get("/tmp"));
+        TestCaseBundleStore store = new TestCaseBundleStore(client, props(3));
         store.pruneOldBundles("simple", "cur");
 
         verify(client, never()).removeObject(any(RemoveObjectArgs.class));
@@ -87,7 +86,7 @@ class TestCaseBundleStorePruneTest {
     void swallowsErrors_neverThrows() throws Exception {
         MinioClient client = mock(MinioClient.class);
         when(client.listObjects(any(ListObjectsArgs.class))).thenThrow(new RuntimeException("boom"));
-        TestCaseBundleStore store = new TestCaseBundleStore(client, props(3), Paths.get("/tmp"));
+        TestCaseBundleStore store = new TestCaseBundleStore(client, props(3));
         store.pruneOldBundles("simple", "cur");  // must not throw
     }
 }

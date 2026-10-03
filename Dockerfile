@@ -21,6 +21,5 @@ RUN mkdir /otel \
        "https://repo1.maven.org/maven2/io/opentelemetry/javaagent/opentelemetry-javaagent/${OTEL_AGENT_VERSION}/opentelemetry-javaagent-${OTEL_AGENT_VERSION}.jar" \
     && echo "${OTEL_AGENT_SHA256}  /otel/opentelemetry-javaagent.jar" | sha256sum -c -
 COPY --from=builder /app/target/backend-service.jar app.jar
-COPY --from=builder /app/src/main/resources/test_cases ./src/main/resources/test_cases
 EXPOSE 8000
 ENTRYPOINT ["java", "-jar", "app.jar"]

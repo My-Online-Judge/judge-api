@@ -1,2 +1,4 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+# Golden bundle fixtures: their exact bytes (CRLF included) are the test.
+src/test/resources/bundle-golden/** -text

@@ -12,26 +12,21 @@ import io.minio.StatObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import io.minio.messages.Item;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import vn.thanhtuanle.common.constant.AppProperties;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -47,30 +42,23 @@ public class TestCaseBundleStore {
 
     private final MinioClient minio;
     private final MinioProperties props;
-    private final Path baseDir;
 
-    @Autowired
     public TestCaseBundleStore(MinioClient minio, MinioProperties props) {
-        this(minio, props, Paths.get(AppProperties.TEST_CASE_DIR));
-    }
-
-    // package-private: tests inject a temp base dir.
-    TestCaseBundleStore(MinioClient minio, MinioProperties props, Path baseDir) {
         this.minio = minio;
         this.props = props;
-        this.baseDir = baseDir;
     }
 
-    public String publish(String slug) {
+    /** Uploads the bundle made of {@code files} (unless it already exists) and points CURRENT at it. */
+    public String publish(String slug, List<BundleFile> files) {
+        if (files.isEmpty()) {
+            throw new TestCaseBundleException("No test-case files to publish for problem: " + slug);
+        }
         try {
-            List<Path> files = listBundleFiles(baseDir.resolve(slug));
-            if (files.isEmpty()) {
-                throw new TestCaseBundleException("No test-case files to publish for problem: " + slug);
-            }
-            String hash = contentHash(files);
+            List<BundleFile> sorted = BundleFile.sortedByName(files);
+            String hash = contentHash(sorted);
             String key = bundleKey(slug, hash);
             if (!objectExists(key)) {
-                putBytes(key, zip(files), "application/zip");
+                putBytes(key, zip(sorted), "application/zip");
             }
             putBytes(currentKey(slug), hash.getBytes(StandardCharsets.UTF_8), "text/plain");
             pruneOldBundles(slug, hash);
@@ -152,12 +140,12 @@ public class TestCaseBundleStore {
             minio.statObject(StatObjectArgs.builder().bucket(props.getBucket()).object(key).build());
             return true;
         } catch (ErrorResponseException e) {
-            String code = e.errorResponse() != null ? e.errorResponse().code() : null;
-            if ("NoSuchKey".equals(code) || "NoSuchObject".equals(code)) {
+            if (isMissing(e)) {
                 return false;  // genuinely absent
             }
             // 403 AccessDenied, throttling, etc. must NOT read as "absent".
-            throw new TestCaseBundleException("Failed to stat object " + key + " (code=" + code + ")", e);
+            throw new TestCaseBundleException("Failed to stat object " + key
+                    + " (code=" + (e.errorResponse() != null ? e.errorResponse().code() : null) + ")", e);
         } catch (Exception e) {
             throw new TestCaseBundleException("Failed to stat object " + key, e);
         }
@@ -173,35 +161,34 @@ public class TestCaseBundleStore {
         }
     }
 
-    static List<Path> listBundleFiles(Path dir) throws IOException {
-        if (!Files.isDirectory(dir)) {
-            return List.of();
-        }
-        try (Stream<Path> s = Files.list(dir)) {
-            return s.filter(Files::isRegularFile)
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
-                    .toList();
+    /** True only when MinIO says the object does not exist; any other error is a real failure. */
+    static boolean isMissing(ErrorResponseException e) {
+        String code = e.errorResponse() != null ? e.errorResponse().code() : null;
+        return "NoSuchKey".equals(code) || "NoSuchObject".equals(code);
+    }
+
+    static String contentHash(List<BundleFile> sortedFiles) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            for (BundleFile f : sortedFiles) {
+                md.update(f.name().getBytes(StandardCharsets.UTF_8));
+                md.update((byte) 0);
+                md.update(f.content());
+            }
+            return HexFormat.of().formatHex(md.digest()).substring(0, 12);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 
-    static String contentHash(List<Path> sortedFiles) throws Exception {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        for (Path f : sortedFiles) {
-            md.update(f.getFileName().toString().getBytes(StandardCharsets.UTF_8));
-            md.update((byte) 0);
-            md.update(Files.readAllBytes(f));
-        }
-        return HexFormat.of().formatHex(md.digest()).substring(0, 12);
-    }
-
-    static byte[] zip(List<Path> sortedFiles) throws IOException {
+    static byte[] zip(List<BundleFile> sortedFiles) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(bos)) {
-            for (Path f : sortedFiles) {
-                ZipEntry entry = new ZipEntry(f.getFileName().toString());
+            for (BundleFile f : sortedFiles) {
+                ZipEntry entry = new ZipEntry(f.name());
                 entry.setTime(0L); // deterministic archive
                 zos.putNextEntry(entry);
-                zos.write(Files.readAllBytes(f));
+                zos.write(f.content());
                 zos.closeEntry();
             }
         }
