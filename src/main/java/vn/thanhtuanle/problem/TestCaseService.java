@@ -83,8 +83,11 @@ public class TestCaseService {
     /**
      * {@link #contextByName} for the problem with this id — deleted problems included, so old submissions
      * stay readable. Empty for an unknown id: every row then shows as hidden.
+     *
+     * <p>Deliberately not {@code @Transactional}: it runs inside its caller's transaction (the verdict
+     * transaction among them), and a transactional proxy here would mark that transaction rollback-only
+     * on any exception before {@code LocalProblemCatalog.sampleCases} can fail closed.
      */
-    @Transactional(readOnly = true)
     public Map<String, TestCaseContext> contextByProblemId(UUID problemId) {
         return problemRepository.findById(problemId).map(this::contextByName).orElse(Map.of());
     }
