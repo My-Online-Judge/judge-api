@@ -23,11 +23,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
@@ -77,6 +80,29 @@ public class TestCaseBundleStore {
             return new String(is.readAllBytes(), StandardCharsets.UTF_8).trim();
         } catch (Exception e) {
             throw new TestCaseBundleException("No published test-case bundle for problem: " + slug, e);
+        }
+    }
+
+    /**
+     * The files of the bundle CURRENT points at, by name; empty when the problem has no bundle. Only the
+     * one-time 2a backfill needs this, to recover test-case files that exist nowhere else.
+     */
+    public Map<String, byte[]> currentBundleFiles(String slug) {
+        if (!hasBundle(slug)) {
+            return Map.of();
+        }
+        String key = bundleKey(slug, currentVersion(slug));
+        try (InputStream is = minio.getObject(GetObjectArgs.builder().bucket(props.getBucket()).object(key).build());
+             ZipInputStream zis = new ZipInputStream(is)) {
+            Map<String, byte[]> files = new HashMap<>();
+            for (ZipEntry entry = zis.getNextEntry(); entry != null; entry = zis.getNextEntry()) {
+                if (!entry.isDirectory()) {
+                    files.put(entry.getName(), zis.readAllBytes());
+                }
+            }
+            return files;
+        } catch (Exception e) {
+            throw new TestCaseBundleException("Failed to read bundle " + key, e);
         }
     }
 
