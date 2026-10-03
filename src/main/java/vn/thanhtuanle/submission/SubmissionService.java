@@ -4,7 +4,6 @@ import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -20,8 +19,9 @@ import vn.thanhtuanle.common.payload.PageResponse;
 import vn.thanhtuanle.entity.Language;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.JudgeService;
-import vn.thanhtuanle.messaging.event.SubmissionRequestedAppEvent;
+import vn.thanhtuanle.messaging.KafkaTopics;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
 import vn.thanhtuanle.oj.common.security.CurrentUser;
 import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
@@ -43,7 +43,7 @@ public class SubmissionService {
     private final ProblemCatalog problemCatalog;
     private final LanguageRepository languageRepository;
     private final SubmissionMapper submissionMapper;
-    private final ApplicationEventPublisher applicationEventPublisher;
+    private final OutboxWriter outboxWriter;
     private final SubmissionSseRegistry sseRegistry;
     private final SubmissionDetailAssembler detailAssembler;
     // Shared transactional EntityManager proxy — used only for refresh() in streamVerdict.
@@ -73,7 +73,8 @@ public class SubmissionService {
         try {
             SubmissionRequestedEvent event = judgeService.buildRequestedEvent(
                     submission.getId().toString(), submission.getSourceCode(), spec, language);
-            applicationEventPublisher.publishEvent(new SubmissionRequestedAppEvent(event));
+            // Sent by the outbox relay once this transaction has committed — never for a rolled-back row.
+            outboxWriter.append(KafkaTopics.SUBMISSION_REQUESTED, event.getSubmissionId(), event);
             log.info("Submission {} queued for judging", submission.getId());
             return submissionMapper.toDto(submission);
         } finally {

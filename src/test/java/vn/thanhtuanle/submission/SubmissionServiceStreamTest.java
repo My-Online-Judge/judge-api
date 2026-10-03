@@ -7,7 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import vn.thanhtuanle.common.enums.SubmissionResult;
@@ -38,7 +38,7 @@ class SubmissionServiceStreamTest {
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock CurrentUser currentUser;
-    @Mock ApplicationEventPublisher applicationEventPublisher;
+    @Mock OutboxWriter outboxWriter;
     @Mock SubmissionSseRegistry sseRegistry;
     @Mock SubmissionDetailAssembler detailAssembler;
     @Mock EntityManager entityManager;

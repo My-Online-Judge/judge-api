@@ -7,14 +7,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import org.springframework.context.ApplicationEventPublisher;
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
 
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Language;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
-import vn.thanhtuanle.messaging.event.SubmissionRequestedAppEvent;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
 import vn.thanhtuanle.submission.problem.JudgeSpec;
 import vn.thanhtuanle.submission.problem.ProblemCatalog;
@@ -40,14 +39,14 @@ class SubmissionServiceSubmitTest {
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock CurrentUser currentUser;
-    @Mock ApplicationEventPublisher applicationEventPublisher;
+    @Mock OutboxWriter outboxWriter;
     @Mock SubmissionSseRegistry sseRegistry;
     @Mock SubmissionRateLimiter submissionRateLimiter;
 
     @InjectMocks SubmissionService submissionService;
 
     @Test
-    void submit_savesPending_publishesEvent_andReturnsPending() {
+    void submit_savesPending_queuesTheJudgeRequestInTheOutbox_andReturnsPending() {
         SubmissionRequestDto req = SubmissionRequestDto.builder()
                 .sourceCode("int main(){}").languageIdentifier("cpp")
                 .problemSlug("a-plus-b").shareSubmission(false).build();
@@ -66,8 +65,8 @@ class SubmissionServiceSubmitTest {
             s.setId(UUID.randomUUID());
             return s;
         });
-        when(judgeService.buildRequestedEvent(any(), any(), eq(spec), any()))
-                .thenReturn(SubmissionRequestedEvent.builder().submissionId("x").build());
+        SubmissionRequestedEvent event = SubmissionRequestedEvent.builder().submissionId("x").build();
+        when(judgeService.buildRequestedEvent(any(), any(), eq(spec), any())).thenReturn(event);
         when(submissionMapper.toDto(any(Submission.class)))
                 .thenReturn(SubmissionResponseDto.builder()
                         .status(SubmissionResult.PENDING.getValue()).build());
@@ -81,7 +80,7 @@ class SubmissionServiceSubmitTest {
         assertThat(saved.getValue().getUserId()).as("the submitter is recorded by id").isEqualTo(userId);
         assertThat(saved.getValue().getProblemId()).isEqualTo(spec.problemId());
         assertThat(saved.getValue().getProblemSlug()).isEqualTo("a-plus-b");
-        verify(applicationEventPublisher).publishEvent(any(SubmissionRequestedAppEvent.class));
+        verify(outboxWriter).append("submission.requested", "x", event);
         assertThat(dto.getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
     }
 }

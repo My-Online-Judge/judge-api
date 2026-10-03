@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.context.ApplicationEventPublisher;
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
 import vn.thanhtuanle.common.exception.ErrorCode;
 import vn.thanhtuanle.common.exception.RateLimitedException;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
@@ -48,7 +48,7 @@ class SubmissionServiceCooldownTest {
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock CurrentUser currentUser;
-    @Mock ApplicationEventPublisher applicationEventPublisher;
+    @Mock OutboxWriter outboxWriter;
     @Mock SubmissionSseRegistry sseRegistry;
     @Mock SubmissionRateLimiter submissionRateLimiter;
 
@@ -113,5 +113,6 @@ class SubmissionServiceCooldownTest {
                 .when(submissionRateLimiter).acquire(userId);
         assertThatThrownBy(() -> service.submit(req)).isInstanceOf(RateLimitedException.class);
         verify(submissionRepository, never()).save(any());
+        verify(outboxWriter, never()).append(any(), any(), any());
     }
 }
