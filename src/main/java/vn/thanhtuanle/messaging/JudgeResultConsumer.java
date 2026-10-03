@@ -9,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.event.SubmissionJudgedEvent;
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
+import vn.thanhtuanle.oj.common.event.OjTopics;
+import vn.thanhtuanle.oj.common.event.SubmissionVerdictRecorded;
 import vn.thanhtuanle.metrics.OjMetrics;
 import vn.thanhtuanle.submission.SubmissionDetailAssembler;
 import vn.thanhtuanle.submission.SubmissionRepository;
@@ -26,6 +29,7 @@ public class JudgeResultConsumer {
     private final SubmissionMapper submissionMapper;
     private final OjMetrics ojMetrics;
     private final SubmissionDetailAssembler detailAssembler;
+    private final OutboxWriter outboxWriter;
 
     @KafkaListener(topics = KafkaTopics.SUBMISSION_JUDGED, groupId = "judge-api-results")
     @Transactional
@@ -56,6 +60,9 @@ public class JudgeResultConsumer {
             submission.setErrorMessage(event.getErrorMessage());
             submission.setDetails(event.getDetails());
             submissionRepository.save(submission);
+            // Same transaction as the verdict: the fact is announced if and only if it was recorded.
+            outboxWriter.append(OjTopics.SUBMISSION_EVENTS, submission.getProblemId().toString(),
+                    new SubmissionVerdictRecorded(id, submission.getProblemId(), event.getStatus()).toEnvelope());
             // Deferred until this @Transactional method commits (VerdictPubSub.publishAfterCommit):
             // publishing mid-transaction would let a subscriber's fresh re-read still see PENDING
             // while the live publish has already passed its emitter by — a lost verdict.

@@ -1,5 +1,6 @@
 package vn.thanhtuanle.messaging;
 
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,10 +34,11 @@ class JudgeResultConsumerDetailsTest {
     @Mock SubmissionMapper submissionMapper;
     @Mock OjMetrics ojMetrics;
     @Mock SubmissionDetailAssembler detailAssembler;
+    @Mock OutboxWriter outboxWriter;
     @InjectMocks JudgeResultConsumer consumer;
 
     private Submission pending(UUID id) {
-        Submission s = Submission.builder()
+        Submission s = Submission.builder().problemId(UUID.randomUUID())
                 .status(SubmissionResult.PENDING.getValue())
                 .createdAt(LocalDateTime.now())
                 .build();

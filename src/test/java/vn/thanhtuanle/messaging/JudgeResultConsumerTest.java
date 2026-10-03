@@ -1,5 +1,8 @@
 package vn.thanhtuanle.messaging;
 
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
+import vn.thanhtuanle.oj.common.event.EventEnvelope;
+import vn.thanhtuanle.oj.common.event.SubmissionVerdictRecorded;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,6 +23,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,10 +34,11 @@ class JudgeResultConsumerTest {
     @Mock SubmissionMapper submissionMapper;
     @Mock OjMetrics ojMetrics;
     @Mock SubmissionDetailAssembler detailAssembler;
+    @Mock OutboxWriter outboxWriter;
     @InjectMocks JudgeResultConsumer consumer;
 
     private Submission pending(UUID id) {
-        Submission s = Submission.builder()
+        Submission s = Submission.builder().problemId(UUID.randomUUID())
                 .status(SubmissionResult.PENDING.getValue())
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -64,6 +69,11 @@ class JudgeResultConsumerTest {
         // Routed through the after-commit entry point; with no active transaction it
         // degenerates to an immediate publish (see VerdictPubSubTest).
         verify(verdictPubSub).publishAfterCommit(id.toString(), dto);
+        // Announced to problem-service in the verdict's own transaction, keyed by problem.
+        verify(outboxWriter).append(eq("oj.submission.events"), eq(s.getProblemId().toString()),
+                argThat(envelope -> envelope instanceof EventEnvelope<?> sent
+                        && sent.payload().equals(new SubmissionVerdictRecorded(id, s.getProblemId(), 0))
+                        && sent.eventType().equals("SubmissionVerdictRecorded")));
     }
 
     @Test
@@ -85,7 +95,7 @@ class JudgeResultConsumerTest {
     @Test
     void ignoresResult_whenAlreadyFinished() {
         UUID id = UUID.randomUUID();
-        Submission s = Submission.builder().status(SubmissionResult.ACCEPTED.getValue()).build();
+        Submission s = Submission.builder().problemId(UUID.randomUUID()).status(SubmissionResult.ACCEPTED.getValue()).build();
         s.setId(id);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
 
@@ -97,5 +107,7 @@ class JudgeResultConsumerTest {
         assertThat(s.getStatus()).isEqualTo(SubmissionResult.ACCEPTED.getValue());
         verify(submissionRepository, never()).save(any());
         verify(verdictPubSub, never()).publishAfterCommit(any(), any());
+        // A duplicate verdict is not a second fact: exactly one event per submission.
+        verify(outboxWriter, never()).append(any(), any(), any());
     }
 }

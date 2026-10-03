@@ -1,5 +1,6 @@
 package vn.thanhtuanle.messaging;
 
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -48,7 +50,7 @@ class JudgeResultConsumerPublishAfterCommitTest {
     @Test
     void withActiveTransaction_publishesOnlyAfterCommit() {
         UUID id = UUID.randomUUID();
-        Submission s = Submission.builder()
+        Submission s = Submission.builder().problemId(UUID.randomUUID())
                 .status(SubmissionResult.PENDING.getValue())
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -62,7 +64,8 @@ class JudgeResultConsumerPublishAfterCommitTest {
         VerdictPubSub verdictPubSub = spy(new VerdictPubSub(null, null, null));
         doNothing().when(verdictPubSub).publish(any(), any());
         JudgeResultConsumer consumer = new JudgeResultConsumer(
-                submissionRepository, verdictPubSub, submissionMapper, ojMetrics, detailAssembler);
+                submissionRepository, verdictPubSub, submissionMapper, ojMetrics, detailAssembler,
+                mock(OutboxWriter.class));
 
         SubmissionJudgedEvent e = SubmissionJudgedEvent.builder()
                 .submissionId(id.toString()).status(SubmissionResult.ACCEPTED.getValue())

@@ -1,5 +1,6 @@
 package vn.thanhtuanle.messaging;
 
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
 import org.junit.jupiter.api.Test;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
@@ -23,7 +24,7 @@ class JudgeResultConsumerMetricsTest {
     private final SubmissionMapper mapper = mock(SubmissionMapper.class);
     private final OjMetrics metrics = mock(OjMetrics.class);
     private final SubmissionDetailAssembler detailAssembler = mock(SubmissionDetailAssembler.class);
-    private final JudgeResultConsumer consumer = new JudgeResultConsumer(repo, pubSub, mapper, metrics, detailAssembler);
+    private final JudgeResultConsumer consumer = new JudgeResultConsumer(repo, pubSub, mapper, metrics, detailAssembler, mock(OutboxWriter.class));
 
     private SubmissionJudgedEvent event(UUID id, Integer status) {
         SubmissionJudgedEvent e = new SubmissionJudgedEvent();
@@ -36,6 +37,7 @@ class JudgeResultConsumerMetricsTest {
     void records_onWinningVerdict() {
         UUID id = UUID.randomUUID();
         Submission sub = new Submission();
+        sub.setProblemId(UUID.randomUUID());
         sub.setStatus(SubmissionResult.PENDING.getValue());
         sub.setCreatedAt(LocalDateTime.now().minusSeconds(1));
         when(repo.findById(id)).thenReturn(Optional.of(sub));
@@ -47,6 +49,7 @@ class JudgeResultConsumerMetricsTest {
     void doesNotRecord_onDuplicateTerminal() {
         UUID id = UUID.randomUUID();
         Submission sub = new Submission();
+        sub.setProblemId(UUID.randomUUID());
         sub.setStatus(SubmissionResult.ACCEPTED.getValue());
         when(repo.findById(id)).thenReturn(Optional.of(sub));
         consumer.onJudged(event(id, SubmissionResult.WRONG_ANSWER.getValue()));
@@ -57,6 +60,7 @@ class JudgeResultConsumerMetricsTest {
     void doesNotRecord_onNullStatus() {
         UUID id = UUID.randomUUID();
         Submission sub = new Submission();
+        sub.setProblemId(UUID.randomUUID());
         sub.setStatus(SubmissionResult.PENDING.getValue());
         when(repo.findById(id)).thenReturn(Optional.of(sub));
         consumer.onJudged(event(id, null));

@@ -9,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.messaging.VerdictPubSub;
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
+import vn.thanhtuanle.oj.common.event.OjTopics;
+import vn.thanhtuanle.oj.common.event.SubmissionVerdictRecorded;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 
 import java.time.LocalDateTime;
@@ -33,6 +36,7 @@ public class SubmissionReconcileJob {
     private final VerdictPubSub verdictPubSub;
     private final SubmissionMapper submissionMapper;
     private final SubmissionDetailAssembler detailAssembler;
+    private final OutboxWriter outboxWriter;
 
     @Value("${judge.stuck-timeout-min:5}")
     private long stuckTimeoutMin;
@@ -52,6 +56,9 @@ public class SubmissionReconcileJob {
             submission.setErrorMessage(
                     "Judging timed out: no verdict within " + stuckTimeoutMin + " minutes");
             submissionRepository.save(submission);
+            outboxWriter.append(OjTopics.SUBMISSION_EVENTS, submission.getProblemId().toString(),
+                    new SubmissionVerdictRecorded(submission.getId(), submission.getProblemId(),
+                            SubmissionResult.SYSTEM_ERROR.getValue()).toEnvelope());
             // Deferred until this @Transactional method commits (see publishAfterCommit): the
             // whole loop runs before the commit, so an in-loop publish would race subscribers'
             // fresh re-reads exactly like the consumer's did. Payload uses the same two-arg

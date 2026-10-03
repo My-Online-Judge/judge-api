@@ -1,5 +1,6 @@
 package vn.thanhtuanle.messaging;
 
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.slf4j.MDC;
@@ -31,6 +32,7 @@ class JudgeResultConsumerMdcTest {
         SubmissionDetailAssembler detailAssembler = mock(SubmissionDetailAssembler.class);
         UUID id = UUID.randomUUID();
         Submission sub = new Submission();
+        sub.setProblemId(UUID.randomUUID());
         sub.setStatus(SubmissionResult.PENDING.getValue());
         sub.setCreatedAt(LocalDateTime.now().minusSeconds(2));
         when(repo.findById(id)).thenReturn(Optional.of(sub));
@@ -39,7 +41,7 @@ class JudgeResultConsumerMdcTest {
         doAnswer(inv -> { mdcDuring.set(MDC.get("submissionId")); return null; })
                 .when(pubSub).publishAfterCommit(any(), any());
 
-        JudgeResultConsumer consumer = new JudgeResultConsumer(repo, pubSub, mapper, metrics, detailAssembler);
+        JudgeResultConsumer consumer = new JudgeResultConsumer(repo, pubSub, mapper, metrics, detailAssembler, mock(OutboxWriter.class));
         SubmissionJudgedEvent event = new SubmissionJudgedEvent();
         event.setSubmissionId(id.toString());
         event.setStatus(SubmissionResult.ACCEPTED.getValue());

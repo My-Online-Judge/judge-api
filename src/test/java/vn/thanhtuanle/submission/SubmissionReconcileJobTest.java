@@ -1,5 +1,8 @@
 package vn.thanhtuanle.submission;
 
+import vn.thanhtuanle.messaging.outbox.OutboxWriter;
+import vn.thanhtuanle.oj.common.event.EventEnvelope;
+import vn.thanhtuanle.oj.common.event.SubmissionVerdictRecorded;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -42,6 +46,7 @@ class SubmissionReconcileJobTest {
     @Mock StringRedisTemplate redisTemplate;
     @Mock SubmissionSseRegistry sseRegistry;
     final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    @Mock OutboxWriter outboxWriter;
     @InjectMocks SubmissionReconcileJob job;
 
     @BeforeEach
@@ -52,7 +57,7 @@ class SubmissionReconcileJobTest {
     @Test
     void flipsStuckSubmissionToSystemError_andNotifiesSse() {
         UUID id = UUID.randomUUID();
-        Submission stuck = Submission.builder().status(SubmissionResult.PENDING.getValue()).build();
+        Submission stuck = Submission.builder().problemId(UUID.randomUUID()).status(SubmissionResult.PENDING.getValue()).build();
         stuck.setId(id);
         when(submissionRepository.findStuck(anyCollection(), any(LocalDateTime.class)))
                 .thenReturn(List.of(stuck));
@@ -70,6 +75,10 @@ class SubmissionReconcileJobTest {
         // (submissionMapper.toDto(submission, detailAssembler.assemble(submission))), not silently
         // regress to the one-arg mapper, which would pass this stubbing identically.
         verify(detailAssembler).assemble(stuck);
+        verify(outboxWriter).append(eq("oj.submission.events"), eq(stuck.getProblemId().toString()),
+                argThat(envelope -> envelope instanceof EventEnvelope<?> sent
+                        && sent.payload().equals(new SubmissionVerdictRecorded(id, stuck.getProblemId(),
+                                SubmissionResult.SYSTEM_ERROR.getValue()))));
     }
 
     @Test
@@ -81,9 +90,9 @@ class SubmissionReconcileJobTest {
         // publish PER iteration — not just that a single-element case happens to defer.
         UUID id1 = UUID.randomUUID();
         UUID id2 = UUID.randomUUID();
-        Submission stuck1 = Submission.builder().status(SubmissionResult.PENDING.getValue()).build();
+        Submission stuck1 = Submission.builder().problemId(UUID.randomUUID()).status(SubmissionResult.PENDING.getValue()).build();
         stuck1.setId(id1);
-        Submission stuck2 = Submission.builder().status(SubmissionResult.PENDING.getValue()).build();
+        Submission stuck2 = Submission.builder().problemId(UUID.randomUUID()).status(SubmissionResult.PENDING.getValue()).build();
         stuck2.setId(id2);
         when(submissionRepository.findStuck(anyCollection(), any(LocalDateTime.class)))
                 .thenReturn(List.of(stuck1, stuck2));
@@ -100,7 +109,7 @@ class SubmissionReconcileJobTest {
         // way VerdictPubSubTest asserts it.
         VerdictPubSub realPubSub = new VerdictPubSub(redisTemplate, objectMapper, sseRegistry);
         SubmissionReconcileJob txJob = new SubmissionReconcileJob(
-                submissionRepository, realPubSub, submissionMapper, detailAssembler);
+                submissionRepository, realPubSub, submissionMapper, detailAssembler, outboxWriter);
         ReflectionTestUtils.setField(txJob, "stuckTimeoutMin", 5L);
 
         // Simulate the @Transactional wrapper: synchronization active during reconcileStuck.

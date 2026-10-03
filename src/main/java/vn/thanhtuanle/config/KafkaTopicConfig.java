@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
 import vn.thanhtuanle.messaging.KafkaTopics;
+import vn.thanhtuanle.oj.common.event.OjTopics;
 
 /**
  * Declares the submission topics explicitly so their partition count is deterministic instead of
@@ -37,6 +38,15 @@ public class KafkaTopicConfig {
     @Bean
     public NewTopic submissionJudgedTopic() {
         return TopicBuilder.name(KafkaTopics.SUBMISSION_JUDGED)
+                .partitions(partitions)
+                .replicas(1)
+                .build();
+    }
+
+    // Facts about submissions for other services (problem-service counts verdicts from it), keyed by problem id.
+    @Bean
+    public NewTopic submissionEventsTopic() {
+        return TopicBuilder.name(OjTopics.SUBMISSION_EVENTS)
                 .partitions(partitions)
                 .replicas(1)
                 .build();
