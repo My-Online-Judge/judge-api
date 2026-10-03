@@ -1,37 +1,27 @@
 package vn.thanhtuanle.judge;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import vn.thanhtuanle.entity.Language;
-import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
-import vn.thanhtuanle.testcase.TestCaseBundleStore;
+import vn.thanhtuanle.submission.problem.JudgeSpec;
+
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class JudgeServiceTestCaseIdTest {
 
-    @Mock TestCaseBundleStore bundleStore;
-
     @Test
-    void buildRequestedEvent_setsSlugDoubleUnderscoreHashAsTestCaseId() {
-        when(bundleStore.currentVersion("simple-a-plus-b")).thenReturn("abc123def456");
-        JudgeService service = new JudgeService(bundleStore);
-
-        Problem problem = new Problem();
-        problem.setProblemSlug("simple-a-plus-b");
-        problem.setTimeLimit(1000);
-        problem.setMemoryLimit(64L);
-        Language language = languageStub();
+    void buildRequestedEvent_takesTheLimitsAndTheBundleVersionFromTheJudgeSpec() {
+        JudgeService service = new JudgeService();
+        JudgeSpec spec = new JudgeSpec(UUID.randomUUID(), "simple-a-plus-b", 1000, 64L, "abc123def456");
 
         SubmissionRequestedEvent event =
-                service.buildRequestedEvent("sub-1", "int main(){}", problem, language);
+                service.buildRequestedEvent("sub-1", "int main(){}", spec, languageStub());
 
         assertThat(event.getTestCaseId()).isEqualTo("simple-a-plus-b__abc123def456");
+        assertThat(event.getMaxCpuTime()).isEqualTo(1000);
+        assertThat(event.getMaxMemory()).isEqualTo(64L * 1024 * 1024);
     }
 
     private Language languageStub() {

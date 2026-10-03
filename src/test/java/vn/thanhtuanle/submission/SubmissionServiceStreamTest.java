@@ -15,7 +15,7 @@ import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
-import vn.thanhtuanle.problem.ProblemRepository;
+import vn.thanhtuanle.submission.problem.ProblemCatalog;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
 import vn.thanhtuanle.oj.common.security.CurrentUser;
@@ -34,7 +34,7 @@ class SubmissionServiceStreamTest {
 
     @Mock SubmissionRepository submissionRepository;
     @Mock JudgeService judgeService;
-    @Mock ProblemRepository problemRepository;
+    @Mock ProblemCatalog problemCatalog;
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock CurrentUser currentUser;

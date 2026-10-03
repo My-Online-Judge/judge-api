@@ -18,7 +18,6 @@ import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.common.payload.PageResponse;
 import vn.thanhtuanle.entity.Language;
-import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedAppEvent;
@@ -27,7 +26,8 @@ import vn.thanhtuanle.oj.common.security.CurrentUser;
 import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
-import vn.thanhtuanle.problem.ProblemRepository;
+import vn.thanhtuanle.submission.problem.JudgeSpec;
+import vn.thanhtuanle.submission.problem.ProblemCatalog;
 import vn.thanhtuanle.language.LanguageRepository;
 
 
@@ -40,7 +40,7 @@ public class SubmissionService {
 
     private final SubmissionRepository submissionRepository;
     private final JudgeService judgeService;
-    private final ProblemRepository problemRepository;
+    private final ProblemCatalog problemCatalog;
     private final LanguageRepository languageRepository;
     private final SubmissionMapper submissionMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -56,8 +56,9 @@ public class SubmissionService {
         log.info("Start submission for problem: {}", req.getProblemSlug());
         judgeService.validate(req.getSourceCode());
 
-        Problem problem = problemRepository.findLiveBySlug(req.getProblemSlug())
-                .orElseThrow(() -> new ResourceNotFoundException("Problem not found"));
+        // Resolved first — limits and the bundle version included — so neither an unknown problem nor one
+        // that cannot be judged burns the cooldown below.
+        JudgeSpec spec = problemCatalog.judgeSpec(req.getProblemSlug());
         Language language = languageRepository.findByIdentifier(req.getLanguageIdentifier())
                 .orElseThrow(() -> new ResourceNotFoundException("Language not found"));
         UUID userId = currentUser.id();
@@ -66,12 +67,12 @@ public class SubmissionService {
         // and before the row exists so a throttled submit leaves no trace.
         submissionRateLimiter.acquire(userId);
 
-        Submission submission = createPendingSubmission(req, problem, language, userId);
+        Submission submission = createPendingSubmission(req, spec, language, userId);
         submissionRepository.save(submission);
         MDC.put("submissionId", submission.getId().toString());
         try {
             SubmissionRequestedEvent event = judgeService.buildRequestedEvent(
-                    submission.getId().toString(), submission.getSourceCode(), problem, language);
+                    submission.getId().toString(), submission.getSourceCode(), spec, language);
             applicationEventPublisher.publishEvent(new SubmissionRequestedAppEvent(event));
             log.info("Submission {} queued for judging", submission.getId());
             return submissionMapper.toDto(submission);
@@ -80,12 +81,12 @@ public class SubmissionService {
         }
     }
 
-    private Submission createPendingSubmission(SubmissionRequestDto req, Problem problem, Language language,
+    private Submission createPendingSubmission(SubmissionRequestDto req, JudgeSpec spec, Language language,
             UUID userId) {
         return Submission.builder()
                 .sourceCode(req.getSourceCode())
-                .problemId(problem.getId())
-                .problemSlug(problem.getProblemSlug())
+                .problemId(spec.problemId())
+                .problemSlug(spec.problemSlug())
                 .userId(userId)
                 .language(language)
                 .time(0)

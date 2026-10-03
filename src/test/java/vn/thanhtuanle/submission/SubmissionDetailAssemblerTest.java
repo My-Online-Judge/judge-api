@@ -8,9 +8,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.dto.JudgeResultDto;
-import vn.thanhtuanle.problem.TestCaseService;
-import vn.thanhtuanle.problem.dto.TestCaseContext;
 import vn.thanhtuanle.submission.dto.TestCaseResultDto;
+import vn.thanhtuanle.submission.problem.ProblemCatalog;
+import vn.thanhtuanle.submission.problem.SampleTestCase;
 
 import java.util.List;
 import java.util.Map;
@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SubmissionDetailAssemblerTest {
 
-    @Mock TestCaseService testCaseService;
+    @Mock ProblemCatalog problemCatalog;
     @InjectMocks SubmissionDetailAssembler assembler;
 
     private Submission submissionWith(List<JudgeResultDto> details) {
@@ -42,8 +42,7 @@ class SubmissionDetailAssemblerTest {
     @Test
     void hiddenCase_neverExposesTestData() {
         Submission s = submissionWith(List.of(judged("2", -1)));
-        when(testCaseService.contextByProblemId(s.getProblemId()))
-                .thenReturn(Map.of("2", TestCaseContext.hidden()));
+        when(problemCatalog.sampleCases(s.getProblemId())).thenReturn(Map.of());  // "2" is not a sample
 
         TestCaseResultDto row = assembler.assemble(s).get(0);
 
@@ -60,8 +59,8 @@ class SubmissionDetailAssemblerTest {
     @Test
     void sampleCase_exposesInputExpectedAndActual() {
         Submission s = submissionWith(List.of(judged("1", -1)));
-        when(testCaseService.contextByProblemId(s.getProblemId()))
-                .thenReturn(Map.of("1", new TestCaseContext(true, "3 4", "7")));
+        when(problemCatalog.sampleCases(s.getProblemId()))
+                .thenReturn(Map.of("1", new SampleTestCase("1", "3 4", "7")));
 
         TestCaseResultDto row = assembler.assemble(s).get(0);
 
@@ -75,7 +74,7 @@ class SubmissionDetailAssemblerTest {
     void unknownTestCaseName_failsClosedAsHidden() {
         // Admin edited test cases after this submission was judged.
         Submission s = submissionWith(List.of(judged("99", -1)));
-        when(testCaseService.contextByProblemId(s.getProblemId())).thenReturn(Map.of());
+        when(problemCatalog.sampleCases(s.getProblemId())).thenReturn(Map.of());
 
         TestCaseResultDto row = assembler.assemble(s).get(0);
 

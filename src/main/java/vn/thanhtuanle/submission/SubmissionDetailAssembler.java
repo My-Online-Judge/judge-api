@@ -5,9 +5,9 @@ import org.springframework.stereotype.Component;
 
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.dto.JudgeResultDto;
-import vn.thanhtuanle.problem.TestCaseService;
-import vn.thanhtuanle.problem.dto.TestCaseContext;
 import vn.thanhtuanle.submission.dto.TestCaseResultDto;
+import vn.thanhtuanle.submission.problem.ProblemCatalog;
+import vn.thanhtuanle.submission.problem.SampleTestCase;
 
 import java.util.List;
 import java.util.Map;
@@ -26,7 +26,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SubmissionDetailAssembler {
 
-    private final TestCaseService testCaseService;
+    private final ProblemCatalog problemCatalog;
 
     /**
      * @return one row per judged test case, or {@code null} when the submission was judged
@@ -38,14 +38,14 @@ public class SubmissionDetailAssembler {
         if (details == null) {
             return null;
         }
-        Map<String, TestCaseContext> byName = testCaseService.contextByProblemId(submission.getProblemId());
-        return details.stream().map(d -> toRow(d, byName)).toList();
+        Map<String, SampleTestCase> samples = problemCatalog.sampleCases(submission.getProblemId());
+        return details.stream().map(d -> toRow(d, samples)).toList();
     }
 
-    private TestCaseResultDto toRow(JudgeResultDto d, Map<String, TestCaseContext> byName) {
-        // Fail closed: a name with no matching test case row (the admin edited test cases after
-        // this submission was judged) is treated as hidden, never as sample.
-        TestCaseContext ctx = byName.getOrDefault(d.getTestCase(), TestCaseContext.hidden());
+    private TestCaseResultDto toRow(JudgeResultDto d, Map<String, SampleTestCase> samples) {
+        // Fail closed: a name that is not a sample — hidden, edited away by an admin after this
+        // submission was judged, or problems unreachable right now — is shown as hidden.
+        SampleTestCase sample = samples.get(d.getTestCase());
 
         TestCaseResultDto.TestCaseResultDtoBuilder row = TestCaseResultDto.builder()
                 .name(d.getTestCase())
@@ -53,11 +53,11 @@ public class SubmissionDetailAssembler {
                 .cpuTime(d.getCpuTime())
                 .realTime(d.getRealTime())
                 .memory(d.getMemory())
-                .sample(ctx.sample());
+                .sample(sample != null);
 
-        if (ctx.sample()) {
-            row.input(ctx.input())
-               .expectedOutput(ctx.expectedOutput())
+        if (sample != null) {
+            row.input(sample.input())
+               .expectedOutput(sample.expectedOutput())
                .actualOutput(d.getOutput());
         }
         // Hidden: input/expectedOutput/actualOutput are left unset. `output_md5`, `signal`,

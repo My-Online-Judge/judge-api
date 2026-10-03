@@ -34,6 +34,7 @@ public enum ErrorCode {
     BAN_INVALID("Ban type must be IP or DEVICE and value must not be blank", HttpStatus.BAD_REQUEST),
     BAN_NOT_FOUND("Ban not found", HttpStatus.NOT_FOUND),
     SUBMISSION_RATE_LIMITED("You are submitting too fast. Try again in a moment", HttpStatus.TOO_MANY_REQUESTS),
+    PROBLEMS_UNAVAILABLE("Problems are temporarily unavailable. Try again in a moment", HttpStatus.SERVICE_UNAVAILABLE),
     UNCATEGORIZED_EXCEPTION("Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final String message;

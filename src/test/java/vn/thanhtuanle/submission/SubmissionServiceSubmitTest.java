@@ -11,13 +11,13 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Language;
-import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedAppEvent;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
-import vn.thanhtuanle.problem.ProblemRepository;
+import vn.thanhtuanle.submission.problem.JudgeSpec;
+import vn.thanhtuanle.submission.problem.ProblemCatalog;
 import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
@@ -28,6 +28,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,7 +36,7 @@ class SubmissionServiceSubmitTest {
 
     @Mock SubmissionRepository submissionRepository;
     @Mock JudgeService judgeService;
-    @Mock ProblemRepository problemRepository;
+    @Mock ProblemCatalog problemCatalog;
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock CurrentUser currentUser;
@@ -51,12 +52,11 @@ class SubmissionServiceSubmitTest {
                 .sourceCode("int main(){}").languageIdentifier("cpp")
                 .problemSlug("a-plus-b").shareSubmission(false).build();
 
-        Problem problem = Problem.builder().problemSlug("a-plus-b").build();
-        problem.setId(UUID.randomUUID());
+        JudgeSpec spec = new JudgeSpec(UUID.randomUUID(), "a-plus-b", 1000, 256L, "abc123def456");
         Language language = new Language();
         UUID userId = UUID.randomUUID();
 
-        when(problemRepository.findLiveBySlug("a-plus-b")).thenReturn(Optional.of(problem));
+        when(problemCatalog.judgeSpec("a-plus-b")).thenReturn(spec);
         when(languageRepository.findByIdentifier("cpp")).thenReturn(Optional.of(language));
         when(currentUser.id()).thenReturn(userId);
         // simulate JPA's GenerationType.UUID assigning an id on save(), since a bare Mockito
@@ -66,7 +66,7 @@ class SubmissionServiceSubmitTest {
             s.setId(UUID.randomUUID());
             return s;
         });
-        when(judgeService.buildRequestedEvent(any(), any(), any(), any()))
+        when(judgeService.buildRequestedEvent(any(), any(), eq(spec), any()))
                 .thenReturn(SubmissionRequestedEvent.builder().submissionId("x").build());
         when(submissionMapper.toDto(any(Submission.class)))
                 .thenReturn(SubmissionResponseDto.builder()
@@ -79,7 +79,7 @@ class SubmissionServiceSubmitTest {
         verify(submissionRepository).save(saved.capture());
         assertThat(saved.getValue().getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
         assertThat(saved.getValue().getUserId()).as("the submitter is recorded by id").isEqualTo(userId);
-        assertThat(saved.getValue().getProblemId()).isEqualTo(problem.getId());
+        assertThat(saved.getValue().getProblemId()).isEqualTo(spec.problemId());
         assertThat(saved.getValue().getProblemSlug()).isEqualTo("a-plus-b");
         verify(applicationEventPublisher).publishEvent(any(SubmissionRequestedAppEvent.class));
         assertThat(dto.getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 
 import vn.thanhtuanle.common.constant.AppProperties;
 import vn.thanhtuanle.entity.Language;
-import vn.thanhtuanle.entity.Problem;
+import vn.thanhtuanle.submission.problem.JudgeSpec;
 import vn.thanhtuanle.judge.dto.*;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
 
@@ -16,8 +16,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class JudgeService {
-
-    private final vn.thanhtuanle.testcase.TestCaseBundleStore bundleStore;
 
     private static final int MAX_CODE_LENGTH = 10240;
     private static final long BYTES_PER_MB = 1024L * 1024L;
@@ -52,8 +50,8 @@ public class JudgeService {
     }
 
     public SubmissionRequestedEvent buildRequestedEvent(String submissionId, String sourceCode,
-            Problem problem, Language language) {
-        log.info("Building judge request for problem: {}", problem.getProblemSlug());
+            JudgeSpec spec, Language language) {
+        log.info("Building judge request for problem: {}", spec.problemSlug());
 
         JudgeCompileConfigDto compileConfig = JudgeCompileConfigDto.builder()
                 .srcName(language.getSrcName())
@@ -81,9 +79,9 @@ public class JudgeService {
                 .submissionId(submissionId)
                 .src(sourceCode)
                 .languageConfig(languageConfig)
-                .maxCpuTime(problem.getTimeLimit())
-                .maxMemory(problem.getMemoryLimit() * BYTES_PER_MB)
-                .testCaseId(problem.getProblemSlug() + "__" + bundleStore.currentVersion(problem.getProblemSlug()))
+                .maxCpuTime(spec.timeLimitMs())
+                .maxMemory(spec.memoryLimitMb() * BYTES_PER_MB)
+                .testCaseId(spec.problemSlug() + "__" + spec.testCaseVersion())
                 .output(true)
                 .build();
     }

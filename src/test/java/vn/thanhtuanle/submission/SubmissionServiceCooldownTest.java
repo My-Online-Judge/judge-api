@@ -13,12 +13,14 @@ import vn.thanhtuanle.common.exception.ErrorCode;
 import vn.thanhtuanle.common.exception.RateLimitedException;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.entity.Language;
-import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;
 import vn.thanhtuanle.messaging.event.SubmissionRequestedEvent;
-import vn.thanhtuanle.problem.ProblemRepository;
+import vn.thanhtuanle.submission.problem.JudgeSpec;
+import vn.thanhtuanle.submission.problem.ProblemCatalog;
+import vn.thanhtuanle.submission.problem.ProblemCatalogUnavailableException;
+import vn.thanhtuanle.submission.problem.ProblemNotFoundException;
 import vn.thanhtuanle.submission.dto.SubmissionRequestDto;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
@@ -42,7 +44,7 @@ class SubmissionServiceCooldownTest {
 
     @Mock SubmissionRepository submissionRepository;
     @Mock JudgeService judgeService;
-    @Mock ProblemRepository problemRepository;
+    @Mock ProblemCatalog problemCatalog;
     @Mock LanguageRepository languageRepository;
     @Mock SubmissionMapper submissionMapper;
     @Mock CurrentUser currentUser;
@@ -62,7 +64,8 @@ class SubmissionServiceCooldownTest {
         req.setLanguageIdentifier("python3");
         req.setProblemSlug("simple-a-plus-b");
 
-        when(problemRepository.findLiveBySlug("simple-a-plus-b")).thenReturn(Optional.of(new Problem()));
+        when(problemCatalog.judgeSpec("simple-a-plus-b"))
+                .thenReturn(new JudgeSpec(UUID.randomUUID(), "simple-a-plus-b", 1000, 256L, "abc123def456"));
         when(languageRepository.findByIdentifier("python3")).thenReturn(Optional.of(new Language()));
         when(currentUser.id()).thenReturn(userId);
         when(submissionRepository.save(any())).thenAnswer(inv -> {
@@ -83,8 +86,24 @@ class SubmissionServiceCooldownTest {
 
     @Test
     void unknownProblem_doesNotBurnTheCooldown() {
-        when(problemRepository.findLiveBySlug("simple-a-plus-b")).thenReturn(Optional.empty());
+        when(problemCatalog.judgeSpec("simple-a-plus-b")).thenThrow(new ProblemNotFoundException());
         assertThatThrownBy(() -> service.submit(req)).isInstanceOf(ResourceNotFoundException.class);
+        verify(submissionRateLimiter, never()).acquire(any());
+    }
+
+    @Test
+    void aProblemThatCannotBeJudgedDoesNotBurnTheCooldown() {
+        // Before 2a the bundle version was read after the cooldown: a missing bundle cost the user a turn.
+        when(problemCatalog.judgeSpec("simple-a-plus-b"))
+                .thenThrow(new IllegalStateException("No published test-case bundle"));
+        assertThatThrownBy(() -> service.submit(req)).isInstanceOf(IllegalStateException.class);
+        verify(submissionRateLimiter, never()).acquire(any());
+    }
+
+    @Test
+    void problemsUnavailable_doesNotBurnTheCooldown() {
+        when(problemCatalog.judgeSpec("simple-a-plus-b")).thenThrow(new ProblemCatalogUnavailableException());
+        assertThatThrownBy(() -> service.submit(req)).isInstanceOf(ProblemCatalogUnavailableException.class);
         verify(submissionRateLimiter, never()).acquire(any());
     }
 

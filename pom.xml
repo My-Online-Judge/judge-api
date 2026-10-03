@@ -101,6 +101,13 @@
 		<!-- Testcontainers: real-Postgres integration tests for schema/migration validation.
 		     The default test profile runs on H2 with ddl-auto, which cannot reproduce
 		     Postgres column-type drift between the entities and the Flyway baseline. -->
+		<!-- Architecture rules as tests: the submission side reaches problems only through ProblemCatalog. -->
+		<dependency>
+			<groupId>com.tngtech.archunit</groupId>
+			<artifactId>archunit-junit5</artifactId>
+			<version>1.5.1</version>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>postgresql</artifactId>
