@@ -80,6 +80,15 @@ public class TestCaseService {
         return byName;
     }
 
+    /**
+     * {@link #contextByName} for the problem with this id — deleted problems included, so old submissions
+     * stay readable. Empty for an unknown id: every row then shows as hidden.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, TestCaseContext> contextByProblemId(UUID problemId) {
+        return problemRepository.findById(problemId).map(this::contextByName).orElse(Map.of());
+    }
+
     @Transactional
     public TestCaseResponse addTestCase(String slug, MultipartFile input, MultipartFile output) throws IOException {
         log.info("Start add test case for problem: {}", slug);

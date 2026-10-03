@@ -6,7 +6,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.dto.TestCaseResultDto;
@@ -35,7 +34,7 @@ class SubmissionServiceDetailsTest {
     void getById_populatesDetailsFromAssembler() {
         UUID id = UUID.randomUUID();
         UUID ownerId = UUID.randomUUID();
-        Submission s = Submission.builder().problem(new Problem()).userId(ownerId).build();
+        Submission s = Submission.builder().problemId(UUID.randomUUID()).userId(ownerId).build();
         s.setId(id);
         when(submissionRepository.findById(id)).thenReturn(Optional.of(s));
         when(currentUser.id()).thenReturn(ownerId);

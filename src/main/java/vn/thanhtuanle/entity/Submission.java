@@ -43,9 +43,14 @@ public class Submission extends BaseEntity {
 
     private Boolean shareSubmission;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "problem_id", referencedColumnName = "id", nullable = false)
-    private Problem problem;
+    // The problem this was submitted to. Problems move to problem-service (sub-project 2b), so this is a
+    // plain id, not a relationship (V16 dropped the foreign key). The slug is copied at submit time — a
+    // slug never changes and is never reused — so lists by problem need nothing from problem-service.
+    @Column(name = "problem_id", nullable = false)
+    private UUID problemId;
+
+    @Column(name = "problem_slug")
+    private String problemSlug;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "language_id", referencedColumnName = "id", nullable = false)

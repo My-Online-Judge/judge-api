@@ -63,7 +63,8 @@ class SubmissionRepositoryFreshReadTest {
                     .sourceCode("print(1)")
                     .status(SubmissionResult.PENDING.getValue())
                     .time(0).memory(0L)
-                    .problem(problem).language(language).userId(userId)
+                    .problemId(problem.getId()).problemSlug(problem.getProblemSlug())
+                    .language(language).userId(userId)
                     .build());
             problemId = problem.getId();
             languageId = language.getId();

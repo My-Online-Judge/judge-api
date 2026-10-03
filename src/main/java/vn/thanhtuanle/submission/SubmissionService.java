@@ -84,7 +84,8 @@ public class SubmissionService {
             UUID userId) {
         return Submission.builder()
                 .sourceCode(req.getSourceCode())
-                .problem(problem)
+                .problemId(problem.getId())
+                .problemSlug(problem.getProblemSlug())
                 .userId(userId)
                 .language(language)
                 .time(0)
@@ -94,13 +95,10 @@ public class SubmissionService {
                 .build();
     }
 
+    /** An unknown slug gives an empty page: the slug is matched on the submissions, no problem is looked up. */
     @Transactional(readOnly = true)
     public PageResponse<SubmissionResponseDto> getSubmissionsByProblemSlug(String problemSlug, int page, int size) {
         log.info("Service to get submissions by problem slug: {}", problemSlug);
-
-        if (!problemRepository.existsByProblemSlug(problemSlug)) {
-            throw new IllegalArgumentException("Problem not found with slug: " + problemSlug);
-        }
 
         Pageable pageable = PageRequest.of(page, size);
         return PageResponse.of(submissionRepository

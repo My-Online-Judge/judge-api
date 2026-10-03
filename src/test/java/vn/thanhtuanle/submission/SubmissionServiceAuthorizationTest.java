@@ -8,7 +8,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
-import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.submission.dto.SubmissionResponseDto;
 import vn.thanhtuanle.submission.mapper.SubmissionMapper;
@@ -37,7 +36,7 @@ class SubmissionServiceAuthorizationTest {
     @InjectMocks SubmissionService service;
 
     private Submission ownedBy(UUID submissionId, UUID ownerId) {
-        Submission s = Submission.builder().problem(new Problem()).userId(ownerId).build();
+        Submission s = Submission.builder().problemId(UUID.randomUUID()).userId(ownerId).build();
         s.setId(submissionId);
         return s;
     }

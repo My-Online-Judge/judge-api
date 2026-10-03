@@ -36,7 +36,7 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
      */
     @Query("select s.status from Submission s where s.id = :id")
     Integer findStatusById(@Param("id") UUID id);
-    @Query("SELECT s FROM Submission s WHERE s.problem.problemSlug = :slug ORDER BY s.createdAt DESC")
+    @Query("SELECT s FROM Submission s WHERE s.problemSlug = :slug ORDER BY s.createdAt DESC")
     Page<Submission> findByProblemSlugOrderByCreatedAtDesc(@Param("slug") String slug, Pageable pageable);
 
     @Query("""
@@ -53,7 +53,7 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
     @Query("""
                 SELECT s
                 FROM Submission s
-                WHERE s.userId = :userId AND s.problem.problemSlug = :problemSlug
+                WHERE s.userId = :userId AND s.problemSlug = :problemSlug
                 ORDER BY s.createdAt DESC
             """)
     Page<Submission> findByUserIdAndProblemSlugOrderByCreatedAtDesc(

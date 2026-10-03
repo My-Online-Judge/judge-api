@@ -51,7 +51,8 @@ class SubmissionServiceSubmitTest {
                 .sourceCode("int main(){}").languageIdentifier("cpp")
                 .problemSlug("a-plus-b").shareSubmission(false).build();
 
-        Problem problem = new Problem();
+        Problem problem = Problem.builder().problemSlug("a-plus-b").build();
+        problem.setId(UUID.randomUUID());
         Language language = new Language();
         UUID userId = UUID.randomUUID();
 
@@ -78,6 +79,8 @@ class SubmissionServiceSubmitTest {
         verify(submissionRepository).save(saved.capture());
         assertThat(saved.getValue().getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
         assertThat(saved.getValue().getUserId()).as("the submitter is recorded by id").isEqualTo(userId);
+        assertThat(saved.getValue().getProblemId()).isEqualTo(problem.getId());
+        assertThat(saved.getValue().getProblemSlug()).isEqualTo("a-plus-b");
         verify(applicationEventPublisher).publishEvent(any(SubmissionRequestedAppEvent.class));
         assertThat(dto.getStatus()).isEqualTo(SubmissionResult.PENDING.getValue());
     }

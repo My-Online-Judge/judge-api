@@ -63,8 +63,4 @@ public class Problem extends BaseEntity {
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<TestCase> testCases = new ArrayList<>();
-
-    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Submission> submissions = new ArrayList<>();
 }

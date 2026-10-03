@@ -38,7 +38,7 @@ public class SubmissionDetailAssembler {
         if (details == null) {
             return null;
         }
-        Map<String, TestCaseContext> byName = testCaseService.contextByName(submission.getProblem());
+        Map<String, TestCaseContext> byName = testCaseService.contextByProblemId(submission.getProblemId());
         return details.stream().map(d -> toRow(d, byName)).toList();
     }
 
