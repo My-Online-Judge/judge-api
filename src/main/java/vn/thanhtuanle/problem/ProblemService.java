@@ -78,6 +78,8 @@ public class ProblemService {
     }
 
     private void validateCreateRequest(CreateProblemDto dto, MultipartFile zipFile) {
+        rejectDeletedStatus(dto.getStatus());
+        // Deleted problems count: their slug stays taken forever, because submissions keep the slug.
         if (problemRepository.existsByProblemSlug(dto.getProblemSlug())) {
             throw new ResourceAlreadyExistException("Problem slug already exists: " + dto.getProblemSlug());
         }
@@ -195,7 +197,8 @@ public class ProblemService {
     @Transactional
     public ProblemResponseDto updateProblem(String slug, UpdateProblemDto dto) {
         log.info("Start update problem: {}", slug);
-        Problem problem = problemRepository.findByProblemSlug(slug)
+        rejectDeletedStatus(dto.getStatus());
+        Problem problem = problemRepository.findLiveBySlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with slug: " + slug));
 
         problem.setTitle(dto.getTitle());
@@ -218,14 +221,24 @@ public class ProblemService {
         return problemMapper.toDto(saved);
     }
 
+    /**
+     * Soft delete: the problem disappears from lists and detail pages and takes no new submissions,
+     * but its row, test cases, bundles and submissions are kept, and its slug is never reused.
+     */
     @Transactional
     public void deleteProblem(String slug) {
         log.info("Start delete problem: {}", slug);
-        Problem problem = problemRepository.findByProblemSlug(slug)
+        Problem problem = problemRepository.findLiveBySlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with slug: " + slug));
 
-        problemRepository.delete(problem); // cascade + orphanRemoval clears test cases
-        FileUtil.deleteDirectoryQuietly(String.format("%s/%s", AppProperties.TEST_CASE_DIR, slug));
+        problem.setStatus(ProblemStatus.DELETED.getValue());
+        problemRepository.save(problem);
         log.info("End delete problem: {}", slug);
+    }
+
+    private static void rejectDeletedStatus(ProblemStatus status) {
+        if (status == ProblemStatus.DELETED) {
+            throw new IllegalArgumentException("A problem is deleted with DELETE /problems/{slug}, not by its status");
+        }
     }
 }

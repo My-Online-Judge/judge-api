@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import vn.thanhtuanle.common.constant.AppProperties;
+import vn.thanhtuanle.common.enums.ProblemStatus;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.common.util.FileUtil;
 import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
@@ -201,7 +202,7 @@ public class TestCaseService {
     }
 
     private Problem getProblemOrThrow(String slug) {
-        return problemRepository.findByProblemSlug(slug)
+        return problemRepository.findLiveBySlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with slug: " + slug));
     }
 
@@ -213,8 +214,9 @@ public class TestCaseService {
         TestCase tc = testCaseRepository.findById(testCaseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Test case not found: " + testCaseId));
 
-        // Ownership check: the test case must belong to the {slug} problem.
-        if (tc.getProblem() == null || !slug.equals(tc.getProblem().getProblemSlug())) {
+        // Ownership check: the test case must belong to the {slug} problem, which must not be deleted.
+        if (tc.getProblem() == null || !slug.equals(tc.getProblem().getProblemSlug())
+                || tc.getProblem().getStatus() == ProblemStatus.DELETED.getValue()) {
             throw new ResourceNotFoundException(
                     "Test case " + testCaseId + " not found for problem " + slug);
         }

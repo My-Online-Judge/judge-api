@@ -6,6 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import vn.thanhtuanle.common.enums.ProblemStatus;
 import vn.thanhtuanle.common.exception.ResourceNotFoundException;
 import vn.thanhtuanle.common.util.GenerateTestCaseInfoUtil;
 import vn.thanhtuanle.entity.Problem;
@@ -80,5 +81,29 @@ class TestCaseServiceSampleToggleTest {
         verify(testCaseRepository, never()).save(any());
         verifyNoInteractions(bundleStore);
         verifyNoInteractions(infoGenerator);
+    }
+
+    @Test
+    void aTestCaseOfADeletedProblemIsNotFound() {
+        UUID id = UUID.randomUUID();
+        Problem problem = new Problem();
+        problem.setProblemSlug("a-plus-b");
+        problem.setStatus(ProblemStatus.DELETED.getValue());
+        TestCase tc = TestCase.builder().input("a-plus-b/1.in").output("a-plus-b/1.out")
+                .problem(problem).build();
+        tc.setId(id);
+        when(testCaseRepository.findById(id)).thenReturn(Optional.of(tc));
+
+        assertThatThrownBy(() -> service.setSample("a-plus-b", id, true))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(testCaseRepository, never()).save(any());
+    }
+
+    @Test
+    void theTestCasesOfADeletedProblemAreNotListed() {
+        when(problemRepository.findLiveBySlug("gone")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.listTestCases("gone"))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 }

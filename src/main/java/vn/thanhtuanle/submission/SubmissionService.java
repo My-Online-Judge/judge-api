@@ -56,7 +56,7 @@ public class SubmissionService {
         log.info("Start submission for problem: {}", req.getProblemSlug());
         judgeService.validate(req.getSourceCode());
 
-        Problem problem = problemRepository.findByProblemSlug(req.getProblemSlug())
+        Problem problem = problemRepository.findLiveBySlug(req.getProblemSlug())
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found"));
         Language language = languageRepository.findByIdentifier(req.getLanguageIdentifier())
                 .orElseThrow(() -> new ResourceNotFoundException("Language not found"));

@@ -8,7 +8,9 @@ import lombok.Getter;
 @Getter
 public enum ProblemStatus {
     ACTIVE(1),
-    INACTIVE(0);
+    INACTIVE(0),
+    /** Set only by {@code DELETE /problems/{slug}}: the problem is kept, hidden, and closed to new submissions. */
+    DELETED(2);
 
     @JsonValue
     private final int value;

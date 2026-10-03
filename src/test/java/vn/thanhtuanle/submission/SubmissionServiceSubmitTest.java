@@ -55,7 +55,7 @@ class SubmissionServiceSubmitTest {
         Language language = new Language();
         UUID userId = UUID.randomUUID();
 
-        when(problemRepository.findByProblemSlug("a-plus-b")).thenReturn(Optional.of(problem));
+        when(problemRepository.findLiveBySlug("a-plus-b")).thenReturn(Optional.of(problem));
         when(languageRepository.findByIdentifier("cpp")).thenReturn(Optional.of(language));
         when(currentUser.id()).thenReturn(userId);
         // simulate JPA's GenerationType.UUID assigning an id on save(), since a bare Mockito

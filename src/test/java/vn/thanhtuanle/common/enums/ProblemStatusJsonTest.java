@@ -25,6 +25,7 @@ class ProblemStatusJsonTest {
     void aNumberIsReadAsTheStoredValueNotTheOrdinal() throws Exception {
         assertThat(read("1")).isEqualTo(ProblemStatus.ACTIVE);
         assertThat(read("0")).isEqualTo(ProblemStatus.INACTIVE);
+        assertThat(read("2")).isEqualTo(ProblemStatus.DELETED);
     }
 
     @Test

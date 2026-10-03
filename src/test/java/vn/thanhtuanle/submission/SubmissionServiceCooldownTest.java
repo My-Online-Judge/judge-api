@@ -62,7 +62,7 @@ class SubmissionServiceCooldownTest {
         req.setLanguageIdentifier("python3");
         req.setProblemSlug("simple-a-plus-b");
 
-        when(problemRepository.findByProblemSlug("simple-a-plus-b")).thenReturn(Optional.of(new Problem()));
+        when(problemRepository.findLiveBySlug("simple-a-plus-b")).thenReturn(Optional.of(new Problem()));
         when(languageRepository.findByIdentifier("python3")).thenReturn(Optional.of(new Language()));
         when(currentUser.id()).thenReturn(userId);
         when(submissionRepository.save(any())).thenAnswer(inv -> {
@@ -83,7 +83,7 @@ class SubmissionServiceCooldownTest {
 
     @Test
     void unknownProblem_doesNotBurnTheCooldown() {
-        when(problemRepository.findByProblemSlug("simple-a-plus-b")).thenReturn(Optional.empty());
+        when(problemRepository.findLiveBySlug("simple-a-plus-b")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.submit(req)).isInstanceOf(ResourceNotFoundException.class);
         verify(submissionRateLimiter, never()).acquire(any());
     }
