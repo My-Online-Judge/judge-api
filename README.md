@@ -1,5 +1,10 @@
 # Judge API Service
 
+> **Archived.** This was the My Online Judge monolith. It was split into services between 2026-09-27 and
+> 2026-10-04; what remained of it — submissions, judging, languages, judge servers — continues, with this
+> repository's full history, in [oj-submission-service](https://github.com/My-Online-Judge/oj-submission-service).
+> Users and tokens moved to oj-identity-service, problems to oj-problem-service; judge-deployment runs them all.
+
 Backend API service for the Online Judge system. This service manages submissions, languages and judge servers, and integrates with the judging engine. Problems and their test cases live in oj-problem-service, which it calls over gRPC (`ProblemCatalog`); users and tokens live in oj-identity-service.
 
 ## 🛠 Tech Stack
