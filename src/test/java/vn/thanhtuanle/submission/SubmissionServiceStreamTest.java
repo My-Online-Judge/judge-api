@@ -11,7 +11,7 @@ import vn.thanhtuanle.messaging.outbox.OutboxWriter;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import vn.thanhtuanle.common.enums.SubmissionResult;
-import vn.thanhtuanle.common.exception.ResourceNotFoundException;
+import vn.thanhtuanle.oj.common.web.error.ResourceNotFoundException;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.judge.JudgeService;
 import vn.thanhtuanle.language.LanguageRepository;

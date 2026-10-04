@@ -2,7 +2,8 @@ package vn.thanhtuanle.common.exception;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
-import vn.thanhtuanle.common.payload.ApiResponse;
+import vn.thanhtuanle.oj.common.web.payload.ApiResponse;
+import vn.thanhtuanle.oj.common.web.error.RateLimitedException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

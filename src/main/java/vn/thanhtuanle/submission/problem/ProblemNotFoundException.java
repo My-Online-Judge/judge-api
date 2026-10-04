@@ -1,6 +1,6 @@
 package vn.thanhtuanle.submission.problem;
 
-import vn.thanhtuanle.common.exception.ResourceNotFoundException;
+import vn.thanhtuanle.oj.common.web.error.ResourceNotFoundException;
 
 public class ProblemNotFoundException extends ResourceNotFoundException {
 

@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import vn.thanhtuanle.common.constant.AppProperties;
 import vn.thanhtuanle.common.constant.Routes;
-import vn.thanhtuanle.common.payload.ApiResponse;
+import vn.thanhtuanle.oj.common.web.payload.ApiResponse;
 import vn.thanhtuanle.common.util.ClientIpResolver;
 import vn.thanhtuanle.judgeserver.dto.JudgeServerHeartbeatDto;
 import vn.thanhtuanle.judgeserver.dto.JudgeServerResponseDto;

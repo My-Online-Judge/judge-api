@@ -10,7 +10,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import vn.thanhtuanle.common.exception.RateLimitedException;
+import vn.thanhtuanle.oj.common.web.error.RateLimitedException;
 
 import java.time.Duration;
 import java.util.UUID;

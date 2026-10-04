@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import vn.thanhtuanle.common.exception.ErrorCode;
-import vn.thanhtuanle.common.exception.RateLimitedException;
+import vn.thanhtuanle.oj.common.web.error.RateLimitedException;
 
 import java.time.Duration;
 import java.util.UUID;
