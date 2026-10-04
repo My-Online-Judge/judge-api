@@ -57,7 +57,7 @@ class SubmissionsDecoupledFromProblemsMigrationTest {
                     + "VALUES ('" + problemId + "', 1, 256, 1, 1000, now(), now(), 'IT problem', 'two-sum')");
             insertSubmission(s, before, problemId, null);
 
-            flyway("latest").migrate();
+            flyway("17").migrate();   // V18 (2b) makes the slug required: SubmissionSlugRequiredMigrationTest
 
             try (ResultSet rs = s.executeQuery("SELECT problem_slug FROM public.t_submissions WHERE id = '" + before + "'")) {
                 assertThat(rs.next()).isTrue();

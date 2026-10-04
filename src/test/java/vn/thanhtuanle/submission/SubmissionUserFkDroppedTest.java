@@ -52,8 +52,8 @@ class SubmissionUserFkDroppedTest {
 
             try (PreparedStatement ps = c.prepareStatement(
                     "INSERT INTO public.t_submissions "
-                    + "(id, status, \"time\", created_at, updated_at, language_id, problem_id, user_id) "
-                    + "VALUES (?, 6, 0, now(), now(), ?, ?, ?)")) {
+                    + "(id, status, \"time\", created_at, updated_at, language_id, problem_id, problem_slug, user_id) "
+                    + "VALUES (?, 6, 0, now(), now(), ?, ?, 'it-problem', ?)")) {
                 ps.setObject(1, submissionId);
                 ps.setObject(2, UUID.fromString(C_LANGUAGE_ID));
                 ps.setObject(3, problemId);

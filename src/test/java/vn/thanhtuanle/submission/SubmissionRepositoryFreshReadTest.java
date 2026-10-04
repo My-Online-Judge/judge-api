@@ -13,10 +13,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import vn.thanhtuanle.common.enums.SubmissionResult;
 import vn.thanhtuanle.entity.Language;
-import vn.thanhtuanle.entity.Problem;
 import vn.thanhtuanle.entity.Submission;
 import vn.thanhtuanle.language.LanguageRepository;
-import vn.thanhtuanle.problem.ProblemRepository;
 
 import java.util.UUID;
 
@@ -39,7 +37,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SubmissionRepositoryFreshReadTest {
 
     @Autowired SubmissionRepository submissionRepository;
-    @Autowired ProblemRepository problemRepository;
     @Autowired LanguageRepository languageRepository;
     @Autowired PlatformTransactionManager transactionManager;
     // Shared transactional proxy: inside a TransactionTemplate callback it delegates to the
@@ -47,7 +44,6 @@ class SubmissionRepositoryFreshReadTest {
     @Autowired EntityManager entityManager;
 
     private UUID submissionId;
-    private UUID problemId;
     private UUID languageId;
     private UUID userId;
 
@@ -55,18 +51,15 @@ class SubmissionRepositoryFreshReadTest {
     void createPendingSubmission() {
         new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
             userId = UUID.randomUUID();
-            Problem problem = problemRepository.save(Problem.builder()
-                    .title("fresh-read-problem").problemSlug("fresh-read-" + UUID.randomUUID()).build());
             Language language = languageRepository.save(Language.builder()
                     .name("fresh-read-lang").identifier("fresh-read-" + UUID.randomUUID()).build());
             Submission submission = submissionRepository.save(Submission.builder()
                     .sourceCode("print(1)")
                     .status(SubmissionResult.PENDING.getValue())
                     .time(0).memory(0L)
-                    .problemId(problem.getId()).problemSlug(problem.getProblemSlug())
+                    .problemId(UUID.randomUUID()).problemSlug("fresh-read-problem")
                     .language(language).userId(userId)
                     .build());
-            problemId = problem.getId();
             languageId = language.getId();
             submissionId = submission.getId();
         });
@@ -76,7 +69,6 @@ class SubmissionRepositoryFreshReadTest {
     void cleanUp() {
         new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
             submissionRepository.deleteById(submissionId);
-            problemRepository.deleteById(problemId);
             languageRepository.deleteById(languageId);
         });
     }

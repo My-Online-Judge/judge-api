@@ -1,6 +1,6 @@
 # Judge API Service
 
-Backend API service for the Online Judge system. This service manages problems, submissions, and integrates with the judging engine.
+Backend API service for the Online Judge system. This service manages submissions, languages and judge servers, and integrates with the judging engine. Problems and their test cases live in oj-problem-service, which it calls over gRPC (`ProblemCatalog`); users and tokens live in oj-identity-service.
 
 ## 🛠 Tech Stack
 

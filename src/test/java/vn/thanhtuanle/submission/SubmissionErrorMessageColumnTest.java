@@ -62,8 +62,8 @@ class SubmissionErrorMessageColumnTest {
             // The write that used to blow up with SQLState 22001 "value too long for varchar(255)".
             try (PreparedStatement ps = c.prepareStatement(
                     "INSERT INTO public.t_submissions "
-                    + "(id, status, \"time\", created_at, updated_at, language_id, problem_id, error_message) "
-                    + "VALUES (?, ?, 0, now(), now(), ?, ?, ?)")) {
+                    + "(id, status, \"time\", created_at, updated_at, language_id, problem_id, problem_slug, error_message) "
+                    + "VALUES (?, ?, 0, now(), now(), ?, ?, 'it-problem', ?)")) {
                 ps.setObject(1, submissionId);
                 ps.setInt(2, -2); // COMPILE_ERROR
                 ps.setObject(3, UUID.fromString(C_LANGUAGE_ID));

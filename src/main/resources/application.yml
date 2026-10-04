@@ -106,10 +106,3 @@ oj:
     poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:10000}
     batch-size: 100
     retention-days: 7
-
-minio:
-  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
-  access-key: ${MINIO_ACCESS_KEY:minioadmin}
-  secret-key: ${MINIO_SECRET_KEY:minioadmin}
-  bucket: ${MINIO_BUCKET:test-cases}
-  bundle-retention: ${MINIO_BUNDLE_RETENTION:3}

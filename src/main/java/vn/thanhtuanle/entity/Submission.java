@@ -49,7 +49,7 @@ public class Submission extends BaseEntity {
     @Column(name = "problem_id", nullable = false)
     private UUID problemId;
 
-    @Column(name = "problem_slug")
+    @Column(name = "problem_slug", nullable = false)
     private String problemSlug;
 
     @ManyToOne(fetch = FetchType.LAZY)
