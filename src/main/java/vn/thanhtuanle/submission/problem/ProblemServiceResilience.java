@@ -1,0 +1,51 @@
+package vn.thanhtuanle.submission.problem;
+
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.retry.RetryConfig;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+
+import java.time.Duration;
+import java.util.Set;
+
+/**
+ * The policy around every call to problem-service (both RPCs share it). A breaker counts each attempt:
+ * 20-call window, judged from 10 calls, open at 50 % failures for 10 s. Only UNAVAILABLE is retried,
+ * twice, 200 ms apart; a deadline that passed is not (the next attempt would wait as long again).
+ */
+public final class ProblemServiceResilience {
+
+    public static final String NAME = "problem-service";
+
+    /** Answers about the request, not failures of the service: they never open the breaker. */
+    private static final Set<Status.Code> ANSWERS =
+            Set.of(Status.Code.NOT_FOUND, Status.Code.FAILED_PRECONDITION, Status.Code.INVALID_ARGUMENT);
+
+    private ProblemServiceResilience() {
+    }
+
+    public static CircuitBreakerConfig circuitBreakerConfig() {
+        return CircuitBreakerConfig.custom()
+                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
+                .slidingWindowSize(20)
+                .minimumNumberOfCalls(10)
+                .failureRateThreshold(50)
+                .waitDurationInOpenState(Duration.ofSeconds(10))
+                .automaticTransitionFromOpenToHalfOpenEnabled(true)
+                .recordException(ProblemServiceResilience::isFailure)
+                .build();
+    }
+
+    public static RetryConfig retryConfig() {
+        return RetryConfig.custom()
+                .maxAttempts(3)
+                .waitDuration(Duration.ofMillis(200))
+                .retryOnException(e -> e instanceof StatusRuntimeException s
+                        && s.getStatus().getCode() == Status.Code.UNAVAILABLE)
+                .build();
+    }
+
+    static boolean isFailure(Throwable e) {
+        return !(e instanceof StatusRuntimeException s && ANSWERS.contains(s.getStatus().getCode()));
+    }
+}

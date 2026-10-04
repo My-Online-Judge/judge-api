@@ -29,6 +29,8 @@ openapi:
     title: Backend service
     version: 1.0.0
 oj:
+  problems:
+    rpc-token: test-only-service-token-0123456789abcdef
   outbox:
     # Tests drive OutboxRelay directly; no background dispatch against the H2 database.
     relay-enabled: false
