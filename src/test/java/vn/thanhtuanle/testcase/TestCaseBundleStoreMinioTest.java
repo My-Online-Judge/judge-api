@@ -18,8 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers(disabledWithoutDocker = true)
 class TestCaseBundleStoreMinioTest {
 
+    // Upstream MinIO images are gone; the org mirrors the exact image the stack runs (see judge-deployment).
     @Container
-    static final GenericContainer<?> MINIO = new GenericContainer<>("minio/minio:RELEASE.2025-09-07T16-13-09Z")
+    static final GenericContainer<?> MINIO = new GenericContainer<>("ghcr.io/my-online-judge/minio:RELEASE.2025-09-07T16-13-09Z")
             .withCommand("server", "/data")
             .withEnv("MINIO_ROOT_USER", "minioadmin")
             .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
