@@ -146,6 +146,21 @@ class GrpcProblemCatalogTest {
     }
 
     @Test
+    void aRecoveredServiceClosesTheBreakerAfterThreeProbes() {
+        // Little traffic after an outage: the breaker must not linger HALF_OPEN (and keep ProblemServiceCircuitOpen
+        // firing) waiting for many probe calls.
+        breaker.transitionToOpenState();
+        breaker.transitionToHalfOpenState();
+        GrpcProblemCatalog catalog = catalog();
+        for (int i = 0; i < 3; i++) {
+            problems.answer(JudgeSpec.newBuilder().setProblemId(PROBLEM_ID.toString()).setTestCaseVersion("v").build());
+            catalog.judgeSpec("a-plus-b");
+        }
+
+        assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+    }
+
+    @Test
     void sampleCasesAreKeyedByName() {
         problems.answer(SampleTestCases.newBuilder()
                 .addCases(SampleTestCase.newBuilder().setName("1").setInput("1 2\n").setExpectedOutput("3\n"))

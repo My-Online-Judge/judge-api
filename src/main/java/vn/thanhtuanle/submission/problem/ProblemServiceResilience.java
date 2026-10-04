@@ -10,8 +10,10 @@ import java.util.Set;
 
 /**
  * The policy around every call to problem-service (both RPCs share it). A breaker counts each attempt:
- * 20-call window, judged from 10 calls, open at 50 % failures for 10 s. Only UNAVAILABLE is retried,
- * twice, 200 ms apart; a deadline that passed is not (the next attempt would wait as long again).
+ * 20-call window, judged from 10 calls, open at 50 % failures for 10 s, then three probe calls decide
+ * (the default ten kept a quiet site HALF_OPEN, and its alert firing, long after a recovery). Only
+ * UNAVAILABLE is retried, twice, 200 ms apart; a deadline that passed is not (the next attempt would
+ * wait as long again).
  */
 public final class ProblemServiceResilience {
 
@@ -31,6 +33,7 @@ public final class ProblemServiceResilience {
                 .minimumNumberOfCalls(10)
                 .failureRateThreshold(50)
                 .waitDurationInOpenState(Duration.ofSeconds(10))
+                .permittedNumberOfCallsInHalfOpenState(3)
                 .automaticTransitionFromOpenToHalfOpenEnabled(true)
                 .recordException(ProblemServiceResilience::isFailure)
                 .build();
